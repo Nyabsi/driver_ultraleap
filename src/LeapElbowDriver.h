@@ -25,4 +25,5 @@ class LeapElbowDriver final : public LeapTrackedDriver {
     eLeapHandType hand_type_;
     vr::DriverPose_t pose_;
     VrBooleanInputComponent input_proximity_;
+    float m_previousOffset;
 };
