@@ -256,7 +256,7 @@ auto LeapHandDriver::UpdateFromLeapFrame(const LEAP_TRACKING_EVENT* frame) -> vo
                     };
             
             // Space transform from LeapC -> OpenVR Head Space.
-            const auto tracker_head_offset = VrVec3(calculateOffsetDistanceX(), calculateOffsetDistanceY(), calculateOffsetDistanceZ(); // settings_->HmdTrackerOffset();
+            const auto tracker_head_offset = VrVec3(calculateOffsetDistanceX(), calculateOffsetDistanceY(), calculateOffsetDistanceZ()); // settings_->HmdTrackerOffset();
             const auto tracker_head_rotation = VrQuat::FromEulerAngles(-std::numbers::pi / 2.0, 0, std::numbers::pi);
             pose_.qDriverFromHeadRotation = VrQuat::Identity;
             VrVec3::Zero.CopyToArray(pose_.vecDriverFromHeadTranslation);
