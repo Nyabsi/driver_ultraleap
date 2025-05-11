@@ -85,53 +85,9 @@ auto LeapElbowDriver::UpdateFromLeapFrame(const LEAP_TRACKING_EVENT* frame) -> v
         pose_.result = vr::TrackingResult_Running_OK;
         if (const auto hmd_pose = HmdPose::Get(time_offset); hmd_pose.IsValid()) {
             pose_.poseIsValid = true;
-
-            auto calculateOffsetDistanceZ = [&](LEAP_HAND& hand)
-                    {
-                        float elbowHeight = std::abs(hand.arm.prev_joint.y - hand.arm.next_joint.y);
-
-                        float result = elbowHeight - (elbowHeight * 0.6f);
-                        if (m_previousOffset > result && m_previousOffset != 0)
-                            return m_previousOffset;
-
-                        m_previousOffset = result;
-                        return result;
-                    };
-
-            auto calculateOffsetDistanceX = [&](LEAP_HAND& hand)
-                    {
-                        const float dTime = 0.01f; // ~100 hz
-                        
-                        glm::vec3 leapVelocity = headRotation * glm::vec3(hand.accelerometer.x * dTime, hand.accelerometer.z * dTime, hand.accelerometer.y * dTime);
-                        glm::vec3 hmdVelocity = glm::vec3(pose.vVelocity.v[0], pose.vVelocity.v[1], pose.vVelocity.v[2]);
-
-                        glm::vec3 displacement = {
-                            (hmdVelocity.x * dTime) - (leapVelocity.x * dTime),
-                            (hmdVelocity.y * dTime) - (leapVelocity.y * dTime),
-                            (hmdVelocity.z * dTime) - (leapVelocity.z * dTime)
-                        };
-
-                        return displacement.x;
-                    };
-
-            auto calculateOffsetDistanceY = [&](LEAP_HAND& hand)
-                    {
-                        const float dTime = 0.01f; // ~100 hz
-
-                        glm::vec3 leapVelocity = headRotation * glm::vec3(hand.accelerometer.x * dTime, hand.accelerometer.z * dTime, hand.accelerometer.y * dTime);
-                        glm::vec3 hmdVelocity = glm::vec3(pose.vVelocity.v[0], pose.vVelocity.v[1], pose.vVelocity.v[2]);
-
-                        glm::vec3 displacement = {
-                            (hmdVelocity.x * dTime) - (leapVelocity.x * dTime),
-                            (hmdVelocity.y * dTime) - (leapVelocity.y * dTime),
-                            (hmdVelocity.z * dTime) - (leapVelocity.z * dTime)
-                        };
-
-                        return displacement.y;
-                    };
             
             // Space transform from LeapC -> OpenVR Head Space.
-            const auto tracker_head_offset = VrVec3(); // settings_->HmdTrackerOffset();
+            const auto tracker_head_offset = settings_->HmdTrackerOffset();
             const auto tracker_head_rotation = VrQuat::FromEulerAngles(-std::numbers::pi / 2.0, 0, std::numbers::pi);
             pose_.qDriverFromHeadRotation = VrQuat::Identity;
             VrVec3::Zero.CopyToArray(pose_.vecDriverFromHeadTranslation);
