@@ -27,6 +27,7 @@ class LeapHandDriver final : public LeapTrackedDriver {
     auto ProcessDebugRequestInputs(const DebugRequestPayload& request_payload, nlohmann::json& response) const -> void override;
 
     eLeapHandType hand_type_;
+    float m_previousOffset;
 
     vr::DriverPose_t pose_;
     std::array<vr::VRBoneTransform_t, 31> bones_transforms_{};
