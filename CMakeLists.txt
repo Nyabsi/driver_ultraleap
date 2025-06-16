@@ -24,31 +24,32 @@ add_subdirectory(${GLM_ROOT})
 option(BUILD_TEST_APPS "Build test applications" OFF)
 
 add_library(driver_leapex SHARED
-        src/LeapDriverFactory.cpp
-        src/LeapDeviceProvider.cpp
-        src/LeapDeviceProvider.h
-        src/LeapDeviceDriver.cpp
-        src/LeapDeviceDriver.h
-        src/LeapHandDriver.cpp
-        src/LeapHandDriver.h
-        src/LeapElbowDriver.cpp
-        src/LeapElbowDriver.h
-        src/LeapDevice.cpp
-        src/LeapDevice.h
-        src/OsUtils.cpp
-        src/OsUtils.h
-        src/VrUtils.h
-        src/VrLogging.h
-        src/VrMaths.h
-        src/VrHand.cpp
-        src/VrHand.h
-        src/LeapDriverSettings.cpp
-        src/LeapDriverSettings.h
-        src/RequestDeserializer.cpp
-        src/RequestDeserializer.h
-        src/LeapTrackedDriver.cpp
-        src/LeapTrackedDriver.h
+        src/driver/LeapDriverFactory.cpp
+        src/driver/LeapDeviceProvider.cpp
+        src/driver/LeapDeviceProvider.h
+        src/driver/LeapDeviceDriver.cpp
+        src/driver/LeapDeviceDriver.h
+        src/driver/LeapHandDriver.cpp
+        src/driver/LeapHandDriver.h
+        src/driver/LeapElbowDriver.cpp
+        src/driver/LeapElbowDriver.h
+        src/driver/LeapDevice.cpp
+        src/driver/LeapDevice.h
+        src/driver/OsUtils.cpp
+        src/driver/OsUtils.h
+        src/driver/VrUtils.h
+        src/driver/VrLogging.h
+        src/driver/VrMaths.h
+        src/driver/VrHand.cpp
+        src/driver/VrHand.h
+        src/driver/LeapDriverSettings.cpp
+        src/driver/LeapDriverSettings.h
+        src/driver/RequestDeserializer.cpp
+        src/driver/RequestDeserializer.h
+        src/driver/LeapTrackedDriver.cpp
+        src/driver/LeapTrackedDriver.h
 )
+
 target_compile_features(driver_leapex PUBLIC cxx_std_20)
 target_link_libraries(driver_leapex
     PRIVATE
