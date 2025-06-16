@@ -10,7 +10,7 @@
 
 <span align="center">
 
-# SteamVR Driver
+# LeapEx - SteamVR Driver for Ultraleap devices
 
 </span>
 

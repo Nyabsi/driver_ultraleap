@@ -1,14 +1,14 @@
 {
   "jsonid": "input_profile",
-  "controller_type": "ultraleap_hand",
-  "remapping": "{ultraleap}/input/ultraleap_hand_remapping.json",
+  "controller_type": "leapex_hand",
+  "remapping": "{leapex}/input/leapex_hand_remapping.json",
   "input_bindingui_mode": "controller_handed",
   "input_bindingui_left": {
     "transform": "scale(-1,1)",
-    "image": "{ultraleap}/bindingui/ultraleap_hand.svg"
+    "image": "{leapex}/bindingui/leapex_hand.svg"
   },
   "input_bindingui_right": {
-    "image": "{ultraleap}/bindingui/ultraleap_hand.svg"
+    "image": "{leapex}/bindingui/leapex_hand.svg"
   },
   "input_source": {
     "/input/index_pinch": {

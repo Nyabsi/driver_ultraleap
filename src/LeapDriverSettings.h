@@ -11,6 +11,7 @@ class LeapDriverSettings {
     LeapDriverSettings();
     auto LoadSettings() -> void;
 
+    [[nodiscard]] auto TrackingEnabled() const -> bool { return tracking_enabled_; }
     [[nodiscard]] auto TrackingMode() const -> eLeapTrackingMode { return tracking_mode_; }
     [[nodiscard]] auto HmdTrackerOffset() const -> VrVec3 { return hmd_tracker_offset_; }
     [[nodiscard]] auto DesktopTrackerOffset() const -> VrVec3 { return desktop_tracker_offset_; }
@@ -30,6 +31,7 @@ class LeapDriverSettings {
 
     bool is_restarting = false;
     const char* restart_text = "Pending changes to the settings require a restart to apply.";
+    std::atomic<bool> tracking_enabled_{};
     std::atomic<eLeapTrackingMode> tracking_mode_;
     std::atomic<VrVec3> hmd_tracker_offset_{};
     std::atomic<VrVec3> desktop_tracker_offset_{};

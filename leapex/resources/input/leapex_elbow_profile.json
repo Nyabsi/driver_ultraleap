@@ -1,0 +1,13 @@
+{
+  "jsonid": "input_profile",
+  "controller_type": "leapex_elbow",
+  "input_bindingui_mode": "single_device",
+
+  "tracker_types": {
+    "TrackerRole_LeftElbow": "{leapex}/input/tracker/leapex_left_elbow_profile.json",
+    "TrackerRole_RightElbow": "{leapex}/input/tracker/leapex_right_elbow_profile.json"
+  },
+
+  "input_source": {
+  }
+}

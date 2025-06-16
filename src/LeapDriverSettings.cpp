@@ -8,27 +8,30 @@ LeapDriverSettings::LeapDriverSettings() {
 }
 
 auto LeapDriverSettings::LoadSettings() -> void {
-    if (const auto tracking_mode = VrSettings::Get<std::string>("tracking_mode"); tracking_mode == "hmd") {
+    tracking_enabled_ = VrSettings::Get<bool>("tracking_enabled");
+
+    if (const auto tracking_mode = VrSettings::Get<int>("tracking_mode"); tracking_mode == 0) {
         tracking_mode_ = eLeapTrackingMode_HMD;
-    } else if (tracking_mode == "desktop") {
+    } else if (tracking_mode == 1) {
         tracking_mode_ = eLeapTrackingMode_Desktop;
     } else {
         // Default to HMD if this is set incorrectly.
-        LOG_INFO(R"(Unrecogonised setting for "tracking_mode": "{}" (should be "hmd" or "desktop"))", tracking_mode);
+        LOG_INFO(R"(Unrecogonised setting for "tracking_mode": "{}" (should be "0 (hmd)\" or "1 (desktop)\"))", tracking_mode);
         tracking_mode_ = eLeapTrackingMode_HMD;
     }
 
+    // offset is stored in "cm" so scale all offset to "meters"
     hmd_tracker_offset_ = VrVec3{
         VrSettings::Get<float>("hmd_tracker_offset_x"),
         VrSettings::Get<float>("hmd_tracker_offset_y"),
         VrSettings::Get<float>("hmd_tracker_offset_z"),
-    };
+    } * 0.01;
 
     desktop_tracker_offset_ = VrVec3{
         VrSettings::Get<float>("desktop_tracker_offset_x"),
         VrSettings::Get<float>("desktop_tracker_offset_y"),
         VrSettings::Get<float>("desktop_tracker_offset_z"),
-    };
+    } * 0.01;
 
     enable_elbow_trackers_ = VrSettings::Get<bool>("enable_elbow_trackers");
     external_input_only_ = VrSettings::Get<bool>("external_input_only");
@@ -41,9 +44,9 @@ auto LeapDriverSettings::UpdateTrackingMode(const eLeapTrackingMode value) -> vo
         tracking_mode_ = value;
 
         switch (value) {
-        case eLeapTrackingMode_Desktop: VrSettings::Set("tracking_mode", "desktop"); break;
+        case eLeapTrackingMode_Desktop: VrSettings::Set("tracking_mode", 1); break;
         case eLeapTrackingMode_HMD:
-        default: VrSettings::Set("tracking_mode", "hmd");
+        default: VrSettings::Set("tracking_mode", 0);
         }
     }
 

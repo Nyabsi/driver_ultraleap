@@ -1,5 +1,5 @@
 {
-  "to_controller_type": "ultraleap_hand",
+  "to_controller_type": "leapex_hand",
   "layouts": [
     {
       "from_controller_type": "knuckles",

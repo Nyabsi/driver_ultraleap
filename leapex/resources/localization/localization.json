@@ -7,15 +7,15 @@
     "sir170": "Ultraleap StereoIR 170",
     "3di": "Ultraleap 3Di",
 
-    "ultraleap_hand": "Ultraleap Tracked Hand",
-    "ultraleap_hand_extended": "Ultraleap Tracked Hand (Extended Mode)",
-    "ultraleap_elbow": "Ultraleap Tracked Elbow",
+    "leapex_hand": "Ultraleap Tracked Hand",
+    "leapex_hand_extended": "Ultraleap Tracked Hand (Extended Mode)",
+    "leapex_elbow": "Ultraleap Tracked Elbow",
 
     "left_hand": "Left Hand",
     "right_hand": "Right Hand",
 
-    "ultraleap_left_elbow": "Left Elbow",
-    "ultraleap_right_elbow": "Right Elbow",
+    "leapex_left_elbow": "Left Elbow",
+    "leapex_right_elbow": "Right Elbow",
 
     "/input/index_pinch": "Index Pinch",
     "/input/grip": "Grip",
@@ -25,6 +25,30 @@
     "/input/finger/index": "Index Finger",
     "/input/finger/middle": "Middle Finger",
     "/input/finger/ring": "Ring Finger",
-    "/input/finger/pinky": "Pinky Finger"
+    "/input/finger/pinky": "Pinky Finger",
+
+    "settings_title": "LeapEx",
+
+    "setting_tracking_enabled": "Enable Tracking",
+
+    "setting_tracking_mode": "Tracking Mode",
+
+    "setting_tracking_mode_value_hmd": "Headset",
+    "setting_tracking_mode_value_desktop": "Desktop",
+
+    "setting_manual_offset_adjust": "Adjust Tracker Offset",
+
+    "setting_tracker_offset_x": "Tracker Offset X",
+    "setting_tracker_offset_y": "Tracker Offset Y",
+    "setting_tracker_offset_z": "Tracker Offset Z",
+
+    "setting_elbow_tracker_emulation": "Emulate Elbow Trackers",
+
+    "setting_extended_hand_profile": "Extended Input Profile",
+    "setting_external_input_only": "Only External Input",
+
+    "setting_prioritize_controller_input": "Prioritize Controller Input",
+    "setting_tracking_passthrough": "Tracking Passthrough",
+    "setting_tracking_passthrough_disable_position": "Disable Position Passthrough"
   }
 ]

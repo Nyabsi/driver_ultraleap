@@ -303,7 +303,7 @@ class VrSettings {
     }
 
   private:
-    static constexpr auto kUltraleapSection = "driver_ultraleap";
+    static constexpr auto kUltraleapSection = "driver_leapex";
 };
 
 template <>

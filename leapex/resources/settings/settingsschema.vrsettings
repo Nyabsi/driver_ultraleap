@@ -1,0 +1,77 @@
+[
+  {
+    "title": "#{leapex}settings_title",
+    "show_without_hmd": true,
+    "values": [
+      {
+        "name": "/settings/driver_leapex/tracking_enabled",
+        "control": "toggle",
+        "label": "#{leapex}setting_tracking_enabled",
+        "requires_restart": true
+      },
+      {
+        "name": "/settings/driver_leapex/tracking_mode",
+        "control": "select",
+        "label": "#{leapex}setting_tracking_mode",
+        "type": "int",
+        "options": [
+          {
+            "value": "0",
+            "label": "#{leapex}setting_tracking_mode_value_hmd"
+          },
+          {
+            "value": "1",
+            "label": "#{leapex}setting_tracking_mode_value_desktop"
+          }
+        ],
+        "requires_restart": true
+      },
+      {
+        "name": "/settings/driver_leapex/prioritize_controller_input",
+        "control": "toggle",
+        "label": "#{leapex}setting_prioritize_controller_input",
+        "requires_restart": true
+      },
+      {
+        "name": "/settings/driver_leapex/enable_elbow_trackers",
+        "control": "toggle",
+        "label": "#{leapex}setting_elbow_tracker_emulation",
+        "requires_restart": true
+      },
+      {
+        "name": "/settings/driver_leapex/tracking_passthrough",
+        "control": "toggle",
+        "label": "#{leapex}setting_tracking_passthrough",
+        "advanced_only": true,
+        "requires_restart": true
+      },
+      {
+        "name": "/settings/driver_leapex/tracking_passthrough_disable_position",
+        "control": "toggle",
+        "label": "#{leapex}setting_tracking_passthrough_disable_position",
+        "advanced_only": true,
+        "requires_restart": true,
+        "requires": {
+          "/settings/driver_leapex/tracking_passthrough": true
+        }
+      },
+      {
+        "name": "/settings/driver_leapex/extended_hand_profile",
+        "control": "toggle",
+        "label": "#{leapex}setting_extended_hand_profile",
+        "requires_restart": true,
+        "advanced_only": true
+      },
+      {
+        "name": "/settings/driver_leapex/external_input_only",
+        "control": "toggle",
+        "label": "#{leapex}setting_external_input_only",
+        "requires_restart": true,
+        "advanced_only": true,
+        "requires": {
+          "/settings/driver_leapex/extended_hand_profile": true
+        }
+      }
+    ]
+  }
+]

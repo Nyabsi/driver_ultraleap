@@ -67,22 +67,22 @@ auto LeapHandDriver::Activate(const uint32_t object_id) -> vr::EVRInitError {
 
         // Setup the controller in normal or extended mode.
         if (!extended) {
-            properties.Set(vr::Prop_ControllerType_String, "ultraleap_hand");
-            properties.Set(vr::Prop_InputProfilePath_String, "{ultraleap}/input/ultraleap_hand_profile.json");
+            properties.Set(vr::Prop_ControllerType_String, "leapex_hand");
+            properties.Set(vr::Prop_InputProfilePath_String, "{leapex}/input/leapex_hand_profile.json");
         } else {
-            properties.Set(vr::Prop_ControllerType_String, "ultraleap_hand_extended");
-            properties.Set(vr::Prop_InputProfilePath_String, "{ultraleap}/input/ultraleap_hand_extended_profile.json");
+            properties.Set(vr::Prop_ControllerType_String, "leapex_hand_extended");
+            properties.Set(vr::Prop_InputProfilePath_String, "{leapex}/input/leapex_hand_extended_profile.json");
         }
 
         // Setup properties that are different per hand.
         if (hand_type_ == eLeapHandType_Left) {
             properties.Set(vr::Prop_ControllerRoleHint_Int32, vr::TrackedControllerRole_LeftHand);
             properties.Set(vr::Prop_ModelNumber_String, extended ? "left_hand_ext" : "left_hand");
-            properties.Set(vr::Prop_RenderModelName_String, "{ultraleap}/rendermodels/ultraleap_hand_left");
+            properties.Set(vr::Prop_RenderModelName_String, "{leapex}/rendermodels/leapex_hand_left");
         } else {
             properties.Set(vr::Prop_ControllerRoleHint_Int32, vr::TrackedControllerRole_RightHand);
             properties.Set(vr::Prop_ModelNumber_String, extended ? "right_hand_ext" : "right_hand");
-            properties.Set(vr::Prop_RenderModelName_String, "{ultraleap}/rendermodels/ultraleap_hand_right");
+            properties.Set(vr::Prop_RenderModelName_String, "{leapex}/rendermodels/leapex_hand_right");
         }
 
         // System input paths.
@@ -192,6 +192,12 @@ auto LeapHandDriver::GetPose() -> vr::DriverPose_t {
 auto LeapHandDriver::UpdateFromLeapFrame(const LEAP_TRACKING_EVENT* frame) -> void {
     // Check we've been activated before allowing updates from the tracking thread.
     if (!active_) {
+        return;
+    }
+
+    if (!settings_->TrackingEnabled())
+    {
+        vr::VRServerDriverHost()->TrackedDevicePoseUpdated(id_, kDeviceConnectedPose, sizeof(pose_));
         return;
     }
 

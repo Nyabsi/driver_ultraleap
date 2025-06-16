@@ -20,11 +20,11 @@ auto LeapElbowDriver::Activate(const uint32_t object_id) -> vr::EVRInitError {
 
     try {
         const auto properties = VrDeviceProperties::FromDeviceId(id_);
-        properties.Set(vr::Prop_ControllerType_String, "ultraleap_elbow");
+        properties.Set(vr::Prop_ControllerType_String, "leapex_elbow");
         properties.Set(vr::Prop_ModelNumber_String, "elbow_tracker");
         properties.Set(vr::Prop_ManufacturerName_String, "Ultraleap");
-        properties.Set(vr::Prop_RenderModelName_String, "{ultraleap}/rendermodels/ultraleap_elbow");
-        properties.Set(vr::Prop_InputProfilePath_String, "{ultraleap}/input/ultraleap_elbow_profile.json");
+        properties.Set(vr::Prop_RenderModelName_String, "{leapex}/rendermodels/leapex_elbow");
+        properties.Set(vr::Prop_InputProfilePath_String, "{leapex}/input/leapex_elbow_profile.json");
 
         // Device capabilities.
         properties.Set(vr::Prop_DeviceIsWireless_Bool, true);
