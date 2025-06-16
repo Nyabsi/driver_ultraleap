@@ -224,7 +224,7 @@ static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface
     }
 
     // Select Surface Format
-    const VkFormat requestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
+    const VkFormat requestSurfaceImageFormat[] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_SNORM};
     const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     wd->SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
         g_PhysicalDevice,
@@ -293,11 +293,74 @@ static void FrameRender(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data) {
     if (err != VK_SUBOPTIMAL_KHR)
         check_vk_result(err);
 
+    VkCommandBufferBeginInfo begin_info = {};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
     ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
     {
         err = vkWaitForFences(g_Device, 1, &fd->Fence, VK_TRUE, UINT64_MAX); // wait indefinitely instead of periodically checking
         check_vk_result(err);
 
+        err = vkResetFences(g_Device, 1, &fd->Fence);
+        check_vk_result(err);
+    }
+    {
+        err = vkResetCommandPool(g_Device, fd->CommandPool, 0);
+        check_vk_result(err);
+
+       
+        err = vkBeginCommandBuffer(fd->CommandBuffer, &begin_info);
+        check_vk_result(err);
+    }
+    {
+        // Transition image layout
+        VkImageMemoryBarrier barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = fd->Backbuffer,
+            .subresourceRange =
+                {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+        };
+
+        vkCmdPipelineBarrier(
+            fd->CommandBuffer,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &barrier
+        );
+
+        vkEndCommandBuffer(fd->CommandBuffer);
+    }
+    {
+        VkSubmitInfo submit_info = {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &fd->CommandBuffer,
+        };
+
+        vkQueueSubmit(g_Queue, 1, &submit_info, fd->Fence);
+
+        vkWaitForFences(g_Device, 1, &fd->Fence, VK_TRUE, UINT64_MAX);
+    }
+    {
         vr::VRVulkanTextureData_t vulkanTexure{};
         vulkanTexure.m_nImage = (uintptr_t)fd->Backbuffer;
         vulkanTexure.m_pDevice = g_Device;
@@ -308,25 +371,20 @@ static void FrameRender(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data) {
         vulkanTexure.m_nWidth = g_MainWindowData.Width;
         vulkanTexure.m_nHeight = g_MainWindowData.Height;
         vulkanTexure.m_nFormat = g_MainWindowData.SurfaceFormat.format;
-        vulkanTexure.m_nSampleCount = 0; // no multi sampling
+        vulkanTexure.m_nSampleCount = VK_SAMPLE_COUNT_1_BIT; // no multi sampling
 
         vr::Texture_t vrTexture{};
         vrTexture.handle = (void*)&vulkanTexure;
-        vrTexture.eColorSpace = vr::ColorSpace_Linear;
+        vrTexture.eColorSpace = vr::ColorSpace_Auto;
         vrTexture.eType = vr::TextureType_Vulkan;
 
         vr::VROverlay()->SetOverlayTexture(g_Overlayhandle, &vrTexture);
-
-        err = vkResetFences(g_Device, 1, &fd->Fence);
-        check_vk_result(err);
     }
     {
-        err = vkResetCommandPool(g_Device, fd->CommandPool, 0);
-        check_vk_result(err);
-        VkCommandBufferBeginInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        err = vkBeginCommandBuffer(fd->CommandBuffer, &info);
+        vkResetCommandPool(g_Device, fd->CommandPool, 0);
+        vkBeginCommandBuffer(fd->CommandBuffer, &begin_info);
+
+        err = vkResetFences(g_Device, 1, &fd->Fence);
         check_vk_result(err);
     }
     {
@@ -431,7 +489,7 @@ int main(int, char**) {
     // Initialize the overlay as "VRApplication_Background" instead of "VRApplication_Overlay"
     // This makes sure that the overlay *cannot* run while SteamVR is not running.
     VR_Init(&error, vr::VRApplication_Background);
-    printf("Error: %d", error);
+    printf("Error: %d", error); // TODO: handle 121
 
     // TODO: don't hardcode
      if (!vr::VRApplications()->IsApplicationInstalled("nyabsi.LeapEx")) {
@@ -445,14 +503,9 @@ int main(int, char**) {
         return 1;
     }
 
-    // Tell SteamVR that we want to make Dashboard overlay
-    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_VisibleInDashboard, true);
-    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_EnableControlBar, true);
-    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_EnableControlBarKeyboard, true);
-    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_SendVRDiscreteScrollEvents, true);
-
     vr::VROverlay()->SetOverlayInputMethod(g_Overlayhandle, vr::VROverlayInputMethod_Mouse);
-    vr::VROverlay()->SetOverlayWidthInMeters(g_Overlayhandle, 1.0f);
+    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_SendVRDiscreteScrollEvents, true);
+    vr::VROverlay()->SetOverlayWidthInMeters(g_Overlayhandle, 2.5f);
 
     // Create Framebuffers
     int w, h;
@@ -622,15 +675,13 @@ int main(int, char**) {
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();
 
-        const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
-        if (!is_minimized) {
-            wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
-            wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
-            wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
-            wd->ClearValue.color.float32[3] = clear_color.w;
-            FrameRender(wd, draw_data);
-            FramePresent(wd);
-        }
+        wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
+        wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
+        wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
+        wd->ClearValue.color.float32[3] = clear_color.w;
+
+        FrameRender(wd, draw_data);
+        FramePresent(wd);
     }
 
     // Cleanup
