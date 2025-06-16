@@ -12,14 +12,16 @@ project(driver_leapex)
 set(LeapSDK_DIR ${CMAKE_SOURCE_DIR}/3rdparty/LeapSDK/lib/cmake/LeapSDK)
 set(OpenVR_ROOT ${CMAKE_SOURCE_DIR}/3rdparty/OpenVR)
 set(GLM_ROOT ${CMAKE_SOURCE_DIR}/3rdparty/GLM)
+set(JSON_ROOT ${CMAKE_SOURCE_DIR}/3rdparty/json)
 
 find_package(OpenVR REQUIRED)
 find_package(LeapSDK 5 REQUIRED)
-add_subdirectory(3rdparty/json EXCLUDE_FROM_ALL)
 
-# Add GLM (avoiding an annoying target it adds by creating a dummy one with the same name).
-add_custom_target(uninstall)
+add_subdirectory(${JSON_ROOT} EXCLUDE_FROM_ALL)
 add_subdirectory(${GLM_ROOT})
+
+# Include rest of the CMake bindings
+add_subdirectory(3rdparty)
 
 option(BUILD_TEST_APPS "Build test applications" OFF)
 
@@ -58,6 +60,20 @@ target_link_libraries(driver_leapex
         glm::glm
         nlohmann_json::nlohmann_json
 )
+
+add_executable(leapex_overlay
+    src/overlay/Main.cpp
+)
+
+target_compile_features(leapex_overlay PUBLIC cxx_std_20)
+target_link_libraries(leapex_overlay
+    PRIVATE
+        OpenVR::API
+        nlohmann_json::nlohmann_json
+        ImGui
+)
+
+add_dependencies(leapex_overlay driver_leapex)
 
 # Force all compilers to output to binary folder without additional output (like Windows adds "Debug" and "Release" folders)
 set(driver_binary_dir ${CMAKE_BINARY_DIR}/leapex/bin/win64)
