@@ -15,7 +15,7 @@ add_subdirectory(3rdparty/json EXCLUDE_FROM_ALL)
 add_custom_target(uninstall)
 add_subdirectory(${GLM_ROOT})
 
-option(BUILD_TEST_APPS "Build test applications" ON)
+option(BUILD_TEST_APPS "Build test applications" OFF)
 
 add_library(driver_ultraleap SHARED
         src/LeapDriverFactory.cpp
