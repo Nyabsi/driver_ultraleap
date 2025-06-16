@@ -3,6 +3,8 @@
 *.lo
 *.o
 
+out/
+
 # Precompiled Headers
 *.gch
 *.pch
@@ -31,3 +33,4 @@ cmake-build-*
 
 # IDE-specific stuff:
 .idea/
+.vs/
