@@ -1,0 +1,18 @@
+{
+    "source": "builtin",
+    "applications": [
+        {
+            "app_key": "nyabsi.LeapEx",
+            "launch_type": "binary",
+            "binary_path_windows": ".\\leapex_overlay.exe",
+            "is_dashboard_overlay": true,
+
+            "strings": {
+                "en_us": {
+                    "name": "LeapEx",
+                    "description": "LeapEx Advanced Configuration"
+                }
+            }
+        }
+    ]
+}

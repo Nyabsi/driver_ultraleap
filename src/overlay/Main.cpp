@@ -27,11 +27,7 @@
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
-// Volk headers
-#ifdef IMGUI_IMPL_VULKAN_USE_VOLK
-#define VOLK_IMPLEMENTATION
-#include <volk.h>
-#endif
+#include <openvr.h>
 
 // #define APP_USE_UNLIMITED_FRAME_RATE
 #ifdef _DEBUG
@@ -52,6 +48,8 @@ static VkDescriptorPool g_DescriptorPool = VK_NULL_HANDLE;
 static ImGui_ImplVulkanH_Window g_MainWindowData;
 static uint32_t g_MinImageCount = 2;
 static bool g_SwapChainRebuild = false;
+static vr::VROverlayHandle_t g_Overlayhandle = NULL;
+static vr::VROverlayHandle_t g_OverlayThumbnailHandle = NULL;
 
 static void check_vk_result(VkResult err) {
     if (err == VK_SUCCESS)
@@ -226,9 +224,8 @@ static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface
     }
 
     // Select Surface Format
-    const VkFormat requestSurfaceImageFormat[] =
-        {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM};
-    const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+    const VkFormat requestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
+    const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     wd->SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
         g_PhysicalDevice,
         wd->Surface,
@@ -301,6 +298,25 @@ static void FrameRender(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data) {
         err = vkWaitForFences(g_Device, 1, &fd->Fence, VK_TRUE, UINT64_MAX); // wait indefinitely instead of periodically checking
         check_vk_result(err);
 
+        vr::VRVulkanTextureData_t vulkanTexure{};
+        vulkanTexure.m_nImage = (uintptr_t)fd->Backbuffer;
+        vulkanTexure.m_pDevice = g_Device;
+        vulkanTexure.m_pPhysicalDevice = g_PhysicalDevice;
+        vulkanTexure.m_pInstance = g_Instance;
+        vulkanTexure.m_pQueue = g_Queue;
+        vulkanTexure.m_nQueueFamilyIndex = g_QueueFamily;
+        vulkanTexure.m_nWidth = g_MainWindowData.Width;
+        vulkanTexure.m_nHeight = g_MainWindowData.Height;
+        vulkanTexure.m_nFormat = g_MainWindowData.SurfaceFormat.format;
+        vulkanTexure.m_nSampleCount = 0; // no multi sampling
+
+        vr::Texture_t vrTexture{};
+        vrTexture.handle = (void*)&vulkanTexure;
+        vrTexture.eColorSpace = vr::ColorSpace_Linear;
+        vrTexture.eType = vr::TextureType_Vulkan;
+
+        vr::VROverlay()->SetOverlayTexture(g_Overlayhandle, &vrTexture);
+
         err = vkResetFences(g_Device, 1, &fd->Fence);
         check_vk_result(err);
     }
@@ -360,6 +376,7 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd) {
     info.swapchainCount = 1;
     info.pSwapchains = &wd->Swapchain;
     info.pImageIndices = &wd->FrameIndex;
+
     VkResult err = vkQueuePresentKHR(g_Queue, &info);
     if (err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR)
         g_SwapChainRebuild = true;
@@ -381,7 +398,7 @@ int main(int, char**) {
 
     // Create window with Vulkan graphics context
     float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-    SDL_WindowFlags window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    SDL_WindowFlags window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window* window = SDL_CreateWindow(
         "Dear ImGui SDL3+Vulkan example",
         (int)(1280 * main_scale),
@@ -409,6 +426,33 @@ int main(int, char**) {
         printf("Failed to create Vulkan surface.\n");
         return 1;
     }
+
+    vr::EVRInitError error;
+    // Initialize the overlay as "VRApplication_Background" instead of "VRApplication_Overlay"
+    // This makes sure that the overlay *cannot* run while SteamVR is not running.
+    VR_Init(&error, vr::VRApplication_Background);
+    printf("Error: %d", error);
+
+    // TODO: don't hardcode
+     if (!vr::VRApplications()->IsApplicationInstalled("nyabsi.LeapEx")) {
+        vr::VRApplications()->AddApplicationManifest("C:\\Users\\User\\source\\repos\\driver_ultraleap\\out\\build\\x64-Debug\\manifest.vrmanifest");
+    }
+
+    vr::VROverlay()->CreateDashboardOverlay("nyabsi.LeapEx", "LeapEx", &g_Overlayhandle, &g_OverlayThumbnailHandle);
+
+    if (g_Overlayhandle == vr::k_ulOverlayHandleInvalid) {
+        printf("Failed to create overlay\n");
+        return 1;
+    }
+
+    // Tell SteamVR that we want to make Dashboard overlay
+    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_VisibleInDashboard, true);
+    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_EnableControlBar, true);
+    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_EnableControlBarKeyboard, true);
+    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_SendVRDiscreteScrollEvents, true);
+
+    vr::VROverlay()->SetOverlayInputMethod(g_Overlayhandle, vr::VROverlayInputMethod_Mouse);
+    vr::VROverlay()->SetOverlayWidthInMeters(g_Overlayhandle, 1.0f);
 
     // Create Framebuffers
     int w, h;
@@ -456,6 +500,7 @@ int main(int, char**) {
     init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.Allocator = g_Allocator;
     init_info.CheckVkResultFn = check_vk_result;
+
     ImGui_ImplVulkan_Init(&init_info);
 
     // Load Fonts
@@ -576,6 +621,7 @@ int main(int, char**) {
         // Rendering
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();
+
         const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
         if (!is_minimized) {
             wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
