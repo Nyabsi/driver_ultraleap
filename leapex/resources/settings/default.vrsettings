@@ -17,7 +17,7 @@
   },
 
   "trackers": {
-    "/devices/ultraleap/LeftElbow": "TrackerRole_LeftElbow",
-    "/devices/ultraleap/RightElbow": "TrackerRole_RightElbow"
+    "/devices/leapex/LeftElbow": "TrackerRole_LeftElbow",
+    "/devices/leapex/RightElbow": "TrackerRole_RightElbow"
   }
 }

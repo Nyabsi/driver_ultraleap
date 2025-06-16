@@ -7,7 +7,7 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-project(driver_ultraleap)
+project(driver_leapex)
 
 set(LeapSDK_DIR ${CMAKE_SOURCE_DIR}/3rdparty/LeapSDK/lib/cmake/LeapSDK)
 set(OpenVR_ROOT ${CMAKE_SOURCE_DIR}/3rdparty/OpenVR)
@@ -23,7 +23,7 @@ add_subdirectory(${GLM_ROOT})
 
 option(BUILD_TEST_APPS "Build test applications" OFF)
 
-add_library(driver_ultraleap SHARED
+add_library(driver_leapex SHARED
         src/LeapDriverFactory.cpp
         src/LeapDeviceProvider.cpp
         src/LeapDeviceProvider.h
@@ -49,8 +49,8 @@ add_library(driver_ultraleap SHARED
         src/LeapTrackedDriver.cpp
         src/LeapTrackedDriver.h
 )
-target_compile_features(driver_ultraleap PUBLIC cxx_std_20)
-target_link_libraries(driver_ultraleap
+target_compile_features(driver_leapex PUBLIC cxx_std_20)
+target_link_libraries(driver_leapex
     PRIVATE
         OpenVR::Driver
         LeapSDK::LeapC
@@ -59,28 +59,28 @@ target_link_libraries(driver_ultraleap
 )
 
 # Force all compilers to output to binary folder without additional output (like Windows adds "Debug" and "Release" folders)
-set(driver_binary_dir ${CMAKE_BINARY_DIR}/ultraleap/bin/win64)
-set_target_properties(driver_ultraleap PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${driver_binary_dir})
+set(driver_binary_dir ${CMAKE_BINARY_DIR}/leapex/bin/win64)
+set_target_properties(driver_leapex PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${driver_binary_dir})
 foreach(output_config ${CMAKE_CONFIGURATION_TYPES})
     string(TOUPPER ${output_config} output_config)
-    set_target_properties(driver_ultraleap PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${output_config} ${driver_binary_dir})
+    set_target_properties(driver_leapex PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${output_config} ${driver_binary_dir})
 endforeach()
 
 # Copy the required DLL dependencies.
 add_custom_command(
-        TARGET driver_ultraleap POST_BUILD
+        TARGET driver_leapex POST_BUILD
         COMMENT "Copying DLLs"
-        COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:driver_ultraleap> $<TARGET_RUNTIME_DLLS:driver_ultraleap>
+        COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:driver_leapex> $<TARGET_RUNTIME_DLLS:driver_leapex>
         COMMAND_EXPAND_LISTS
 )
 
-add_custom_target(driver_ultraleap_resources)
+add_custom_target(driver_leapex_resources)
 add_custom_command(
-        TARGET driver_ultraleap_resources POST_BUILD
+        TARGET driver_leapex_resources POST_BUILD
         COMMENT "Copying Resources & Manifest"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/ultraleap ${CMAKE_BINARY_DIR}/ultraleap
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/leapex ${CMAKE_BINARY_DIR}/leapex
 )
-add_dependencies(driver_ultraleap driver_ultraleap_resources)
+add_dependencies(driver_leapex driver_leapex_resources)
 
 # Build test applications if requested.
 if (BUILD_TEST_APPS)
@@ -99,5 +99,5 @@ if (BUILD_TEST_APPS)
         COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:test_debug_request> $<TARGET_RUNTIME_DLLS:test_debug_request>
         COMMAND_EXPAND_LISTS
     )
-    add_dependencies(test_debug_request driver_ultraleap)
+    add_dependencies(test_debug_request driver_leapex)
 endif()
