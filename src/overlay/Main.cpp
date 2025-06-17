@@ -822,6 +822,8 @@ int main(int, char**) {
         }
     }
 
+    vr::VROverlay()->DestroyOverlay(g_Overlayhandle);
+
     // Cleanup
     // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]
     err = vkDeviceWaitIdle(g_Device);
