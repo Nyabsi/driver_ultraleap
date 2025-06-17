@@ -45,44 +45,39 @@ int main(
     // This makes sure that the overlay *cannot* run while SteamVR is not running.
     try {
         OpenVRInit(vr::VRApplication_Background);
-    } catch (std::exception ex) {
-        printf("Failed to initialize OpenVR\n%s\n\n", ex.what());
+    } catch (...) {
+        printf("OpenVRInit\n");
         return EXIT_FAILURE;
     }
 
-    // Get the current HMD refresh rate from device props
     try {
         auto hmd_properties = VrTrackedDeviceProperties::FromDeviceIndex(vr::k_unTrackedDeviceIndex_Hmd);
         g_hmd_refresh_rate = hmd_properties.GetFloat(vr::Prop_DisplayFrequency_Float);
-        printf("g_hmdRefreshRate = %02f\n", g_hmd_refresh_rate);
-    } catch (std::exception ex) {
-        printf("Unable to determine Prop_DisplayFrequency_Float\n%s\n\n", ex.what());
+    } catch (...) {
+        printf("hmdRefreshRate\n");
         return EXIT_FAILURE;
     }
 
-    // Install the Manifest from the current directory if it is not found
     try {
         if (!OpenVRManifestInstalled(APP_KEY)) OpenVRManifestInstall();
-    } catch (std::exception ex) {
-        printf("Failed to install OpenVR manifest\n%s\n\n", ex.what());
+    } catch (...) {
+        printf("AddApplicationManifest\n");
         return EXIT_FAILURE;
     }
     
     try {
         g_overlay->CreateDashboardOverlay(APP_KEY, APP_NAME);
-        // Set the overlay properties
         g_overlay->SetInputMethod(vr::VROverlayInputMethod_Mouse);
         g_overlay->EnableFlag(vr::VROverlayFlags_SendVRDiscreteScrollEvents);
         g_overlay->EnableFlag(vr::VROverlayFlags_EnableClickStabilization);
         g_overlay->SetWidth(2.5f);
-    } catch (std::exception ex) {
-        printf("Failed to create overlay\n%s\n\n", ex.what());
+    } catch (...) {
+        printf("CreateDashboardOverlay\n");
         return EXIT_FAILURE;
     }
 
-    // == SDL Init Begin
-
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+    auto sdl_init_flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO;
+    if (!SDL_Init(sdl_init_flags)) {
         printf("SDL_Init(): %s\n", SDL_GetError());
         return EXIT_FAILURE;
     }
@@ -97,8 +92,8 @@ int main(
 
     VkSurfaceKHR surface = {};
     if (SDL_Vulkan_CreateSurface(window, g_vulkanRenderer->Instance(), g_vulkanRenderer->Allocator(), &surface) == 0) {
-        printf("Failed to create Vulkan surface.\n");
-        return 1;
+        printf("SDL_Vulkan_CreateSurface(): %s\n", SDL_GetError());
+        return EXIT_FAILURE;
     }
 
     int initial_width = {};
@@ -186,7 +181,6 @@ int main(
             }
         }
 
-        // Resize swap chain?
         int fb_width = {};
         int fb_height = {};
         SDL_GetWindowSize(window, &fb_width, &fb_height);
@@ -223,8 +217,6 @@ int main(
             g_vulkanRenderer->Present(wd, is_minimized);
         }
 
-        // == Frametime Limiter Logic Start
-
         float target_time = static_cast<float>(1000000000) / g_hmd_refresh_rate;
         const uint64_t frame_duration = (SDL_GetTicksNS() - g_last_frame_time);
 
@@ -233,8 +225,6 @@ int main(
         }
 
         g_last_frame_time = SDL_GetTicksNS();
-
-        // == Frametime Limiter Logic End
     }
 
     VkResult vk_result = vkDeviceWaitIdle(g_vulkanRenderer->Device());
