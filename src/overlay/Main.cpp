@@ -167,9 +167,11 @@ int main(
     SDL_Event event = {};
     vr::VREvent_t vr_event = {};
 
-    while (g_ticking) {
-
-        while (SDL_PollEvent(&event)) {
+    while (g_ticking) 
+    {
+        // TODO: make sure SDL_PollEvent doesn't conflict with PollNextOverlayEvent
+        while (SDL_PollEvent(&event)) 
+        {
             ImGui_ImplSDL3_ProcessEvent(&event);
 
             if (event.type == SDL_EVENT_QUIT)
@@ -177,36 +179,61 @@ int main(
             if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
                 g_ticking = false;
         }
-
         
         while (vr::VROverlay()->PollNextOverlayEvent(g_overlay->Handle(), &vr_event, sizeof(vr_event))) 
         {
-            switch (vr_event.eventType) {
-            case vr::VREvent_MouseMove: {
-                // OpenGL uses coordinate space Bottom Left == 0,0 where as Vulkan is Top Left == 0,0
-                // So we need to flip the y-axis to get the correct mouse position data
-                auto [xPos, yPos] = std::pair{vr_event.data.mouse.x, ImGui::GetIO().DisplaySize.y - vr_event.data.mouse.y};
-                io.AddMousePosEvent(xPos, yPos);
-            } break;
-            case vr::VREvent_MouseButtonDown:
-                io.AddMouseButtonEvent((vr_event.data.mouse.button & vr::VRMouseButton_Left) == vr::VRMouseButton_Left ? 0 : 1, true);
-                break;
-            case vr::VREvent_MouseButtonUp:
-                io.AddMouseButtonEvent(
-                    (vr_event.data.mouse.button & vr::VRMouseButton_Left) == vr::VRMouseButton_Left ? 0 : 1,
-                    false
-                );
-                break;
-            case vr::VREvent_ScrollDiscrete: {
-                // TODO: fix
-                // const float x = vrEvent.data.scroll.xdelta * 360.0f * 8.0f;
-                // const float y = vrEvent.data.scroll.ydelta * 360.0f * 8.0f;
-                // io.AddMouseWheelEvent(x, y);
-                break;
-            }
-            case vr::VREvent_Quit: 
-                g_ticking = false; 
-                return false;
+            switch (vr_event.eventType) 
+            {
+                case vr::VREvent_MouseMove:
+                {
+                    // OpenGL uses coordinate space Bottom Left == 0,0 where as Vulkan is Top Left == 0,0
+                    // So we need to flip the y-axis to get the correct mouse position data
+                    auto [xPos, yPos] = std::pair{vr_event.data.mouse.x, ImGui::GetIO().DisplaySize.y - vr_event.data.mouse.y};
+                    io.AddMousePosEvent(xPos, yPos);
+                    break;
+                }
+                case vr::VREvent_MouseButtonDown:
+                {
+                    int mouse_button = ImGuiMouseButton_COUNT;
+
+                    if (vr_event.data.mouse.button & vr::VRMouseButton_Left)
+                        mouse_button = ImGuiMouseButton_Left;
+                    if (vr_event.data.mouse.button & vr::VRMouseButton_Right)
+                        mouse_button = ImGuiMouseButton_Right;
+                    if (vr_event.data.mouse.button & vr::VRMouseButton_Middle)
+                        mouse_button = ImGuiMouseButton_Middle;
+
+                    if (mouse_button < ImGuiMouseButton_COUNT)
+                        io.AddMouseButtonEvent(mouse_button, true);
+                    break;
+                }
+                case vr::VREvent_MouseButtonUp:
+                {
+                    int mouse_button = ImGuiMouseButton_COUNT;
+
+                    if (vr_event.data.mouse.button & vr::VRMouseButton_Left)
+                        mouse_button = ImGuiMouseButton_Left;
+                    if (vr_event.data.mouse.button & vr::VRMouseButton_Right)
+                        mouse_button = ImGuiMouseButton_Right;
+                    if (vr_event.data.mouse.button & vr::VRMouseButton_Middle)
+                        mouse_button = ImGuiMouseButton_Middle;
+
+                    if (mouse_button < ImGuiMouseButton_COUNT)
+                        io.AddMouseButtonEvent(mouse_button, false);
+                    break;
+                }
+                case vr::VREvent_ScrollDiscrete: 
+                {
+                    const float y = vr_event.data.scroll.ydelta;
+                    if (y != 0.0f)
+                        io.AddMouseWheelEvent(0.0f, y);
+                    break;
+                }
+                case vr::VREvent_Quit:
+                {
+                    g_ticking = false;
+                    return false;
+                }
             }
         }
 
