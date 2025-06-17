@@ -526,10 +526,19 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd) {
 int main(int, char**) {
 
     vr::EVRInitError error;
+
     // Initialize the overlay as "VRApplication_Background" instead of "VRApplication_Overlay"
     // This makes sure that the overlay *cannot* run while SteamVR is not running.
     VR_Init(&error, vr::VRApplication_Background);
-    printf("VR_Init: %d\n", error); // TODO: handle 121
+
+    // the overlay should not run when SteamVR us not running
+    if (error == vr::VRInitError_Init_NoServerForBackgroundApp) 
+    {
+        // the user doesn't need to know
+        return EXIT_FAILURE;
+    }
+
+    printf("VR_Init: %d\n", error);
 
     // Setup SDL
     // [If using SDL_MAIN_USE_CALLBACKS: all code below until the main loop starts would likely be your SDL_AppInit() function]
@@ -539,7 +548,7 @@ int main(int, char**) {
     }
 
     // Create window with Vulkan graphics context
-    SDL_WindowFlags window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN;
+    SDL_WindowFlags window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_UTILITY; // SDL_WINDOW_UTILITY to hide application from Task Manager & Task Bar
     SDL_Window* window = SDL_CreateWindow(
         "LeapEx",
         (int)(1280),
@@ -561,12 +570,31 @@ int main(int, char**) {
         return 1;
     }
 
-    // TODO: don't hardcode
-     if (!vr::VRApplications()->IsApplicationInstalled("nyabsi.LeapEx")) {
-        vr::VRApplications()->AddApplicationManifest("C:\\Users\\User\\source\\repos\\driver_ultraleap\\out\\build\\x64-Debug\\manifest.vrmanifest");
+    std::string manifestPath{};
+    manifestPath += SDL_GetCurrentDirectory();
+    manifestPath += "manifest.vrmanifest";
+
+    if (!vr::VRApplications()->IsApplicationInstalled("nyabsi.LeapEx")) 
+    {
+        auto manifestError = vr::VRApplications()->AddApplicationManifest(manifestPath.data());
+
+        switch (manifestError)
+        {
+        case vr::VRApplicationError_None: printf("Installed OpenVR manifest from %s\n", manifestPath.data()); break;
+        case vr::VRApplicationError_InvalidManifest: printf("Could not find OpenVR manifest at %s\n", manifestPath.data()); break;
+        default: break;
+        }
+    } else {
+        printf("OpenVR manifest was already registered\n");
     }
 
-    vr::VROverlay()->CreateDashboardOverlay("nyabsi.LeapEx", "LeapEx", &g_Overlayhandle, &g_OverlayThumbnailHandle);
+    auto overlayError = vr::VROverlay()->CreateDashboardOverlay("nyabsi.LeapEx", "LeapEx", &g_Overlayhandle, &g_OverlayThumbnailHandle);
+
+    // Only allow a single instance of the overlay to run at once
+    if (overlayError == vr::VROverlayError_KeyInUse)
+    {
+        return 1;
+    }
 
     if (g_Overlayhandle == vr::k_ulOverlayHandleInvalid) {
         printf("Failed to create overlay\n");
@@ -583,6 +611,8 @@ int main(int, char**) {
     ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
     SetupVulkanWindow(wd, surface, w, h);
     SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+
+    // remove this to prevent SDL window from rendering
     SDL_ShowWindow(window);
 
     // Setup Dear ImGui context
@@ -668,12 +698,6 @@ int main(int, char**) {
                 done = true;
         }
 
-        // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppIterate() function]
-        if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
-            //SDL_Delay(10);
-           // continue;
-        }
-
         vr::VREvent_t vrEvent;
         while (vr::VROverlay()->PollNextOverlayEvent(g_Overlayhandle, &vrEvent, sizeof(vrEvent))) {
             switch (vrEvent.eventType) {
@@ -693,9 +717,9 @@ int main(int, char**) {
                 );
                 break;
             case vr::VREvent_ScrollDiscrete: {
-                const float x = vrEvent.data.scroll.xdelta * 360.0f * 8.0f;
-                const float y = vrEvent.data.scroll.ydelta * 360.0f * 8.0f;
-                io.AddMouseWheelEvent(x, y);
+                // const float x = vrEvent.data.scroll.xdelta * 360.0f * 8.0f;
+                // const float y = vrEvent.data.scroll.ydelta * 360.0f * 8.0f;
+                // io.AddMouseWheelEvent(x, y);
                 break;
             }
             case vr::VREvent_Quit: return false;
