@@ -29,6 +29,10 @@
 
 #include <openvr.h>
 
+#include <sstream>
+#include <fstream>
+#include <vector>
+
 // #define APP_USE_UNLIMITED_FRAME_RATE
 #ifdef _DEBUG
 #define APP_USE_VULKAN_DEBUG_REPORT
@@ -76,6 +80,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_report(
     (void)messageCode;
     (void)pUserData;
     (void)pLayerPrefix; // Unused arguments
+
+    // Filter the specific message by substring match
+    if (strstr(
+            pMessage,
+            "pCreateInfo->pNext<VkExternalMemoryImageCreateInfo>.handleTypes is 16 but the initialLayout is "
+            "VK_IMAGE_LAYOUT_PREINITIALIZED"
+        ) != NULL
+        && objectType == VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT) {
+        // supress report from internal OpenVR behaviour where calling vr::VROverlay()->SetOverlayTexture
+        // initializes VkExternalMemoryImageCreateInfo with VK_IMAGE_LAYOUT_PREINITIALIZED instead of VK_IMAGE_LAYOUT_UNDEFINED
+        return VK_FALSE;
+    }
+
     fprintf(stderr, "[vulkan] Debug report from ObjectType: %i\nMessage: %s\n\n", objectType, pMessage);
     return VK_FALSE;
 }
@@ -88,11 +105,17 @@ static bool IsExtensionAvailable(const ImVector<VkExtensionProperties>& properti
     return false;
 }
 
-static void SetupVulkan(ImVector<const char*> instance_extensions) {
+static std::vector<std::string> requested_instance_extensions = {};
+static std::vector<std::string> requested_device_extensions = {};
+
+static void SetupVulkan() {
     VkResult err;
 #ifdef IMGUI_IMPL_VULKAN_USE_VOLK
     volkInitialize();
 #endif
+
+    requested_instance_extensions.clear();
+    requested_device_extensions.clear();
 
     // Create Vulkan Instance
     {
@@ -107,12 +130,30 @@ static void SetupVulkan(ImVector<const char*> instance_extensions) {
         err = vkEnumerateInstanceExtensionProperties(nullptr, &properties_count, properties.Data);
         check_vk_result(err);
 
-        // Enable required extensions
-        if (IsExtensionAvailable(properties, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
-            instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        uint32_t bufCount = vr::VRCompositor()->GetVulkanInstanceExtensionsRequired(nullptr, 0);
+
+        // we have some extensions to add!
+        if (bufCount > 0) {
+            std::vector<char> extensionBuffer(bufCount + 1); // +1 for null
+            vr::VRCompositor()->GetVulkanInstanceExtensionsRequired(extensionBuffer.data(), bufCount);
+            extensionBuffer[bufCount] = '\0'; // force null-termination
+
+            std::string token;
+            std::istringstream tokenStream(extensionBuffer.data());
+            while (std::getline(tokenStream, token, ' ')) {
+                if (IsExtensionAvailable(properties, token.data())) {
+                    printf("%s Instance Extension asked by OpenVR was available\n", token.data());
+                    requested_instance_extensions.push_back(token);
+                } else {
+                    printf("ERROR! %s Instance Extension asked by OpenVR was NOT available\n", token.data());
+                    std::exit(EXIT_FAILURE); // abort!
+                }
+            }
+        }
+
 #ifdef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
         if (IsExtensionAvailable(properties, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)) {
-            instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+            requested_instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
             create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
         }
 #endif
@@ -122,12 +163,18 @@ static void SetupVulkan(ImVector<const char*> instance_extensions) {
         const char* layers[] = {"VK_LAYER_KHRONOS_validation"};
         create_info.enabledLayerCount = 1;
         create_info.ppEnabledLayerNames = layers;
-        instance_extensions.push_back("VK_EXT_debug_report");
+        requested_instance_extensions.push_back("VK_EXT_debug_report");
 #endif
 
+        std::vector<const char*> enabled_extensions {};
+        for (auto& extension : requested_instance_extensions) {
+            printf("Registring instance extension %s\n", extension.data());
+            enabled_extensions.push_back(extension.data());
+        }
+
         // Create Vulkan Instance
-        create_info.enabledExtensionCount = (uint32_t)instance_extensions.Size;
-        create_info.ppEnabledExtensionNames = instance_extensions.Data;
+        create_info.enabledExtensionCount = (uint32_t)enabled_extensions.size();
+        create_info.ppEnabledExtensionNames = enabled_extensions.data();
         err = vkCreateInstance(&create_info, g_Allocator, &g_Instance);
         check_vk_result(err);
 #ifdef IMGUI_IMPL_VULKAN_USE_VOLK
@@ -160,8 +207,7 @@ static void SetupVulkan(ImVector<const char*> instance_extensions) {
 
     // Create Logical Device (with 1 queue)
     {
-        ImVector<const char*> device_extensions;
-        device_extensions.push_back("VK_KHR_swapchain");
+        requested_device_extensions.push_back("VK_KHR_swapchain");
 
         // Enumerate physical device extension
         uint32_t properties_count;
@@ -169,9 +215,37 @@ static void SetupVulkan(ImVector<const char*> instance_extensions) {
         vkEnumerateDeviceExtensionProperties(g_PhysicalDevice, nullptr, &properties_count, nullptr);
         properties.resize(properties_count);
         vkEnumerateDeviceExtensionProperties(g_PhysicalDevice, nullptr, &properties_count, properties.Data);
+
+        uint32_t bufCount = vr::VRCompositor()->GetVulkanDeviceExtensionsRequired(g_PhysicalDevice, nullptr, 0);
+
+        // we have some extensions to add!
+        if (bufCount > 0) {
+            std::vector<char> extensionBuffer(bufCount + 1); // +1 for null
+            vr::VRCompositor()->GetVulkanDeviceExtensionsRequired(g_PhysicalDevice, extensionBuffer.data(), bufCount);
+            extensionBuffer[bufCount] = '\0'; // force null-termination
+
+            std::string token;
+            std::istringstream tokenStream(extensionBuffer.data());
+            while (std::getline(tokenStream, token, ' ')) {
+                if (IsExtensionAvailable(properties, token.data())) {
+                    printf("%s Device Extension asked by OpenVR was available\n", token.data());
+                    requested_device_extensions.push_back(token);
+                } else {
+                    printf("ERROR! %s Device Extension asked by OpenVR was NOT available\n", token.data());
+                    std::exit(EXIT_FAILURE); // abort!
+                }
+            }
+        }
+
+        std::vector<const char*> enabled_extensions{};
+        for (auto& extension : requested_device_extensions) {
+            printf("Registring device extension %s\n", extension.data());
+            enabled_extensions.push_back(extension.data());
+        }
+
 #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
         if (IsExtensionAvailable(properties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME))
-            device_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+            enabled_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
 #endif
 
         const float queue_priority[] = {1.0f};
@@ -184,8 +258,8 @@ static void SetupVulkan(ImVector<const char*> instance_extensions) {
         create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         create_info.queueCreateInfoCount = sizeof(queue_info) / sizeof(queue_info[0]);
         create_info.pQueueCreateInfos = queue_info;
-        create_info.enabledExtensionCount = (uint32_t)device_extensions.Size;
-        create_info.ppEnabledExtensionNames = device_extensions.Data;
+        create_info.enabledExtensionCount = (uint32_t)enabled_extensions.size();
+        create_info.ppEnabledExtensionNames = enabled_extensions.data();
         err = vkCreateDevice(g_PhysicalDevice, &create_info, g_Allocator, &g_Device);
         check_vk_result(err);
         vkGetDeviceQueue(g_Device, g_QueueFamily, 0, &g_Queue);
@@ -224,7 +298,7 @@ static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface
     }
 
     // Select Surface Format
-    const VkFormat requestSurfaceImageFormat[] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_SNORM};
+    const VkFormat requestSurfaceImageFormat[] = { VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_SRGB };
     const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     wd->SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
         g_PhysicalDevice,
@@ -450,6 +524,13 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd) {
 
 // Main code
 int main(int, char**) {
+
+    vr::EVRInitError error;
+    // Initialize the overlay as "VRApplication_Background" instead of "VRApplication_Overlay"
+    // This makes sure that the overlay *cannot* run while SteamVR is not running.
+    VR_Init(&error, vr::VRApplication_Background);
+    printf("VR_Init: %d\n", error); // TODO: handle 121
+
     // Setup SDL
     // [If using SDL_MAIN_USE_CALLBACKS: all code below until the main loop starts would likely be your SDL_AppInit() function]
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -470,14 +551,7 @@ int main(int, char**) {
         return -1;
     }
 
-    ImVector<const char*> extensions;
-    {
-        uint32_t sdl_extensions_count = 0;
-        const char* const* sdl_extensions = SDL_Vulkan_GetInstanceExtensions(&sdl_extensions_count);
-        for (uint32_t n = 0; n < sdl_extensions_count; n++)
-            extensions.push_back(sdl_extensions[n]);
-    }
-    SetupVulkan(extensions);
+    SetupVulkan();
 
     // Create Window Surface
     VkSurfaceKHR surface;
@@ -486,12 +560,6 @@ int main(int, char**) {
         printf("Failed to create Vulkan surface.\n");
         return 1;
     }
-
-    vr::EVRInitError error;
-    // Initialize the overlay as "VRApplication_Background" instead of "VRApplication_Overlay"
-    // This makes sure that the overlay *cannot* run while SteamVR is not running.
-    VR_Init(&error, vr::VRApplication_Background);
-    printf("Error: %d", error); // TODO: handle 121
 
     // TODO: don't hardcode
      if (!vr::VRApplications()->IsApplicationInstalled("nyabsi.LeapEx")) {
@@ -536,8 +604,9 @@ int main(int, char**) {
     // Setup Platform/Renderer backends
     ImGui_ImplSDL3_InitForVulkan(window);
     ImGui_ImplVulkan_InitInfo init_info = {};
-    // init_info.ApiVersion = VK_API_VERSION_1_3;              // Pass in your value of VkApplicationInfo::apiVersion, otherwise
-    // will default to header version.
+
+    // Let's use Vulkan 1.1 for compatibility reasons
+    init_info.ApiVersion = VK_API_VERSION_1_1;
     init_info.Instance = g_Instance;
     init_info.PhysicalDevice = g_PhysicalDevice;
     init_info.Device = g_Device;
