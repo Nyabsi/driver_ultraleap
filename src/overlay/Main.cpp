@@ -28,7 +28,8 @@ static uint64_t g_last_frame_time = SDL_GetTicksNS();
 static float g_hmd_refresh_rate = 60.0f;
 static bool g_ticking = true;
 
-#define APP_KEY "nyabsi.LeapEx"
+#define APP_KEY     "nyabsi.LeapEx"
+#define APP_NAME    "LeapEx Configuration Overlay"
 
 int main(
     [[maybe_unused]] int argc, 
@@ -55,16 +56,14 @@ int main(
 
     // Install the Manifest from the current directory if it is not found
     try {
-        if (!OpenVRManifestInstalled(APP_KEY)) {
-            OpenVRManifestInstall();
-        }
+        if (!OpenVRManifestInstalled(APP_KEY)) OpenVRManifestInstall();
     } catch (std::exception ex) {
         printf("Failed to install OpenVR manifest\n%s\n\n", ex.what());
         return EXIT_FAILURE;
     }
     
     try {
-        g_overlay->CreateDashboardOverlay("nyabsi.LeapEx", "LeapEx");
+        g_overlay->CreateDashboardOverlay(APP_KEY, APP_NAME);
         // Set the overlay properties
         g_overlay->SetInputMethod(vr::VROverlayInputMethod_Mouse);
         g_overlay->EnableFlag(vr::VROverlayFlags_SendVRDiscreteScrollEvents);
@@ -81,7 +80,7 @@ int main(
         return EXIT_FAILURE;
     }
 
-    SDL_Window* window = SDL_CreateWindow("LeapEx", 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
+    SDL_Window* window = SDL_CreateWindow(APP_NAME, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
     if (window == nullptr) {
         printf("SDL_CreateWindow(): %s\n", SDL_GetError());
         return EXIT_FAILURE;
