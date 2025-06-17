@@ -51,8 +51,7 @@ int main(int, char**) {
         return -1;
     }
 
-    // SDL_WINDOW_UTILITY to hide application from Task Manager & Task Bar
-    SDL_Window* window = SDL_CreateWindow("LeapEx", 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_UTILITY);
+    SDL_Window* window = SDL_CreateWindow("LeapEx", 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
     if (window == nullptr) {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
         return -1;
@@ -251,14 +250,18 @@ int main(int, char**) {
         ImGui::Render();
 
         ImDrawData* draw_data = ImGui::GetDrawData();
+        const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
 
-        wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
-        wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
-        wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
-        wd->ClearValue.color.float32[3] = clear_color.w;
+        if (vr::VROverlay()->IsActiveDashboardOverlay(g_Overlayhandle) || !is_minimized)
+        {
+            wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
+            wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
+            wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
+            wd->ClearValue.color.float32[3] = clear_color.w;
 
-        g_vulkanRenderer->Render(wd, draw_data, g_Overlayhandle);
-        g_vulkanRenderer->Present(wd);
+            g_vulkanRenderer->Render(wd, draw_data, is_minimized, g_Overlayhandle);
+            g_vulkanRenderer->Present(wd, is_minimized);
+        }
 
         float targetTime = static_cast<float>(1000000000) / g_RefreshRate;
         const uint64_t frameDuration = (SDL_GetTicksNS() - lastFrameTime);

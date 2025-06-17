@@ -195,7 +195,7 @@ void VulkanRenderer::RebuildSwapChain(ImGui_ImplVulkanH_Window& wd, int width, i
     should_rebuild_swapchain_ = false;
 }
 
-void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, vr::VROverlayHandle_t overlayHandle) 
+void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, vr::VROverlayHandle_t overlayHandle) 
 {
     VkResult vk_result = {};
 
@@ -222,7 +222,8 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
     ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
 
     // Make sure vr::VROverlay() returns valid pointer and make sure our overlay is currently active before rendering the overlay
-    if (vr::VROverlay() && vr::VROverlay()->IsActiveDashboardOverlay(overlayHandle))
+    const bool overlay_active = vr::VROverlay() && vr::VROverlay()->IsActiveDashboardOverlay(overlayHandle);
+    if (overlay_active)
     {
         vk_result = vkWaitForFences(vulkan_device_, 1, &fd->Fence, VK_TRUE, UINT64_MAX);
         VK_VALIDATE_RESULT(vk_result);
@@ -313,65 +314,66 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
         // TODO: should we restore the barrier after SetOverlayTexture? as it doesn't set VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL back to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
     }
 
-    vk_result = vkWaitForFences(vulkan_device_, 1, &fd->Fence, VK_TRUE, UINT64_MAX);
-    VK_VALIDATE_RESULT(vk_result);
+    if (!is_minimized)
+    {
+        vk_result = vkWaitForFences(vulkan_device_, 1, &fd->Fence, VK_TRUE, UINT64_MAX);
+        VK_VALIDATE_RESULT(vk_result);
 
-    vk_result = vkResetFences(vulkan_device_, 1, &fd->Fence);
-    VK_VALIDATE_RESULT(vk_result);
+        vk_result = vkResetFences(vulkan_device_, 1, &fd->Fence);
+        VK_VALIDATE_RESULT(vk_result);
 
-    vk_result = vkResetCommandPool(vulkan_device_, fd->CommandPool, 0);
-    VK_VALIDATE_RESULT(vk_result);
+        vk_result = vkResetCommandPool(vulkan_device_, fd->CommandPool, 0);
+        VK_VALIDATE_RESULT(vk_result);
 
-    vk_result = vkBeginCommandBuffer(fd->CommandBuffer, &buffer_begin_info);
-    VK_VALIDATE_RESULT(vk_result);
+        vk_result = vkBeginCommandBuffer(fd->CommandBuffer, &buffer_begin_info);
+        VK_VALIDATE_RESULT(vk_result);
 
-    VkRenderPassBeginInfo render_pass_begin_info =
-    { 
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = wd->RenderPass,
-        .framebuffer = fd->Framebuffer,
-        .renderArea =
-        {
-            .extent =
-            {
-                .width = (uint32_t)wd->Width,
-                .height = (uint32_t)wd->Height,
-            },
-        },
-        .clearValueCount = 1,
-        .pClearValues = &wd->ClearValue,
-    };
+        VkRenderPassBeginInfo render_pass_begin_info = {
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+            .renderPass = wd->RenderPass,
+            .framebuffer = fd->Framebuffer,
+            .renderArea =
+                {
+                    .extent =
+                        {
+                            .width = (uint32_t)wd->Width,
+                            .height = (uint32_t)wd->Height,
+                        },
+                },
+            .clearValueCount = 1,
+            .pClearValues = &wd->ClearValue,
+        };
 
-    vkCmdBeginRenderPass(fd->CommandBuffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(fd->CommandBuffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
-    ImGui_ImplVulkan_RenderDrawData(draw_data, fd->CommandBuffer);
+        ImGui_ImplVulkan_RenderDrawData(draw_data, fd->CommandBuffer);
 
-    vkCmdEndRenderPass(fd->CommandBuffer);
+        vkCmdEndRenderPass(fd->CommandBuffer);
 
-    VkPipelineStageFlags wait_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        vk_result = vkEndCommandBuffer(fd->CommandBuffer);
+        VK_VALIDATE_RESULT(vk_result);
 
-    VkSubmitInfo submit_info =
-    { 
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &image_acquired_semaphore,
-        .pWaitDstStageMask = &wait_stage_mask,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &fd->CommandBuffer,
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &render_complete_semaphore,
-    };
+        VkPipelineStageFlags wait_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-    vk_result = vkEndCommandBuffer(fd->CommandBuffer);
-    VK_VALIDATE_RESULT(vk_result);
+        VkSubmitInfo submit_info = {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &image_acquired_semaphore,
+            .pWaitDstStageMask = &wait_stage_mask,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &fd->CommandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = &render_complete_semaphore,
+        };
 
-    vk_result = vkQueueSubmit(vulkan_queue_, 1, &submit_info, fd->Fence);
-    VK_VALIDATE_RESULT(vk_result);
+        vk_result = vkQueueSubmit(vulkan_queue_, 1, &submit_info, fd->Fence);
+        VK_VALIDATE_RESULT(vk_result);
+    }
 }
 
-void VulkanRenderer::Present(ImGui_ImplVulkanH_Window* wd) 
+void VulkanRenderer::Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized) 
 {
-    if (should_rebuild_swapchain_)
+    if (should_rebuild_swapchain_ || is_minimized)
         return;
 
     VkResult vk_result = {};
