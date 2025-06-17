@@ -63,6 +63,7 @@ target_link_libraries(driver_leapex
 
 add_executable(leapex_overlay
     src/overlay/Main.cpp
+    src/overlay/VulkanRenderer.cpp
 )
 
 target_compile_features(leapex_overlay PUBLIC cxx_std_20)
