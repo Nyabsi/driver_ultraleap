@@ -25,7 +25,7 @@ VulkanRenderer::VulkanRenderer()
     vulkan_device_extensions_.clear();
 }
 
-void VulkanRenderer::Initialize() 
+auto VulkanRenderer::Initialize()  -> void
 {
     VkResult vk_result = {};
 
@@ -115,7 +115,7 @@ void VulkanRenderer::Initialize()
     VK_VALIDATE_RESULT(vk_result);
 }
 
-void VulkanRenderer::SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface, int width, int height) 
+auto VulkanRenderer::SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface, int width, int height)  -> void
 {
     VkResult vk_result = {};
 
@@ -159,6 +159,13 @@ void VulkanRenderer::SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surf
     );
 
     assert(minimum_concurrent_image_count_ >= 2);
+    this->BuildSwapchain(wd, width, height);
+}
+
+auto VulkanRenderer::BuildSwapchain(ImGui_ImplVulkanH_Window* wd, int width, int height)  -> void
+{
+    if (should_rebuild_swapchain_)
+        ImGui_ImplVulkan_SetMinImageCount(minimum_concurrent_image_count_);
 
     ImGui_ImplVulkanH_CreateOrResizeWindow(
         vulkan_instance_,
@@ -167,33 +174,16 @@ void VulkanRenderer::SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surf
         wd,
         vulkan_queue_family_,
         vulkan_allocator_,
-        width,
-        height,
-        minimum_concurrent_image_count_
-    );
-}
-
-void VulkanRenderer::RebuildSwapChain(ImGui_ImplVulkanH_Window& wd, int width, int height)
-{
-    ImGui_ImplVulkan_SetMinImageCount(minimum_concurrent_image_count_);
-
-    ImGui_ImplVulkanH_CreateOrResizeWindow(
-        vulkan_instance_,
-        vulkan_physical_device_,
-        vulkan_device_,
-        &wd,
-        vulkan_queue_family_,
-        vulkan_allocator_,
         (uint32_t)width,
         (uint32_t)height,
         minimum_concurrent_image_count_
     );
 
-    wd.FrameIndex = 0;
+    wd->FrameIndex = 0;
     should_rebuild_swapchain_ = false;
 }
 
-void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, VrOverlay*& overlay) 
+auto VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, VrOverlay*& overlay) -> void
 {
     VkResult vk_result = {};
 
@@ -219,7 +209,6 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
 
     ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
 
-    // Make sure vr::VROverlay() returns valid pointer and make sure our overlay is currently active before rendering the overlay
     const bool overlay_active = overlay->IsDashboardActive();
     if (overlay_active)
     {
@@ -325,6 +314,8 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
         vk_result = vkBeginCommandBuffer(fd->CommandBuffer, &buffer_begin_info);
         VK_VALIDATE_RESULT(vk_result);
 
+        // Restore VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL -> VK_IMAGE_LAYOUT_PRESENT_SRC_KHR after Texure is passed to SteamVR
+        // https://github.com/ValveSoftware/openvr/wiki/Vulkan#image-layout
         VkImageMemoryBarrier image_barrier_khr =
         {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -422,7 +413,7 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
     }
 }
 
-void VulkanRenderer::Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized) 
+auto VulkanRenderer::Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized)  -> void
 {
     if (should_rebuild_swapchain_ || is_minimized)
         return;
@@ -455,7 +446,7 @@ void VulkanRenderer::Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized)
     wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->SemaphoreCount;
 }
 
-void VulkanRenderer::Destroy() 
+auto VulkanRenderer::Destroy() -> void
 {
     vkDestroyDescriptorPool(vulkan_device_, vulkan_descriptor_pool_, vulkan_allocator_);
     vkDestroyDevice(vulkan_device_, vulkan_allocator_);

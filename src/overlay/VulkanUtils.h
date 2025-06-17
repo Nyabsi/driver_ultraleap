@@ -8,9 +8,9 @@
 
 #define VK_VALIDATE_RESULT(e)                                  \
     if (e != VK_SUCCESS)                                       \
-        fprintf(stderr, "[vulkan] Error: VkResult = %d\n", e); \
+        fprintf(stderr, "[Vulkan] Error: VkResult = %d\n", e); \
     if (e > 0)                                                 \
-        abort(); \
+        abort();                                               \
 
 static auto GetVulkanInstanceExtensionsRequiredByOpenVR() -> std::vector<std::string>
 {
@@ -52,7 +52,6 @@ static auto GetVulkanInstanceExtensionsRequiredByOpenVR() -> std::vector<std::st
         std::istringstream token_stream(buffer.data());
         while (std::getline(token_stream, token, ' ')) {
             if (IsExtensionAvailable(properties, token)) {
-                printf("%s Instance Extension asked by OpenVR was available\n", token.data());
                 result.push_back(token);
             } else {
                 printf("ERROR! %s Instance Extension asked by OpenVR was NOT available\n", token.data());
@@ -103,7 +102,6 @@ static auto GetVulkanDeviceExtensionsRequiredByOpenVR(const VkPhysicalDevice& de
         std::istringstream token_stream(buffer.data());
         while (std::getline(token_stream, token, ' ')) {
             if (IsExtensionAvailable(properties, token.data())) {
-                printf("%s Instance Extension asked by OpenVR was available\n", token.data());
                 result.push_back(token);
             } else {
                 printf("ERROR! %s Instance Extension asked by OpenVR was NOT available\n", token.data());

@@ -195,7 +195,7 @@ int main(
             ImGuiIO& io = ImGui::GetIO();
             io.DisplaySize = ImVec2(static_cast<float>(g_MainWindowData.Width), static_cast<float>(g_MainWindowData.Height));
 
-            g_vulkanRenderer->RebuildSwapChain(g_MainWindowData, fb_width, fb_height);
+            g_vulkanRenderer->BuildSwapchain(wd, fb_width, fb_height);
         }
 
         g_imGuiWindow->Draw();

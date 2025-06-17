@@ -16,7 +16,7 @@
 class VulkanRenderer {
 public:
     explicit VulkanRenderer();
-    void Initialize();
+    auto Initialize() -> void;
 
     [[nodiscard]] auto Instance() const -> VkInstance { return vulkan_instance_; }
     [[nodiscard]] auto PhysicalDevice() const -> VkPhysicalDevice { return vulkan_physical_device_; }
@@ -30,12 +30,12 @@ public:
     [[nodiscard]] auto MinimumConcurrentImageCount() const -> uint32_t { return minimum_concurrent_image_count_; }
     [[nodiscard]] auto ShouldRebuildSwapChain() const -> bool { return should_rebuild_swapchain_; }
 
-    void SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface, int width, int height);
-    void RebuildSwapChain(ImGui_ImplVulkanH_Window& wd, int width, int height);
-    void Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, VrOverlay*& overlay);
-    void Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized);
+    auto SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface, int width, int height) -> void;
+    auto BuildSwapchain(ImGui_ImplVulkanH_Window* wd, int width, int height) -> void;
+    auto Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, VrOverlay*& overlay) -> void;
+    auto Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized) -> void;
 
-    void Destroy();
+    auto Destroy() -> void;
 
   private:
 
