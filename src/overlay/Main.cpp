@@ -54,6 +54,7 @@ static uint32_t g_MinImageCount = 2;
 static bool g_SwapChainRebuild = false;
 static vr::VROverlayHandle_t g_Overlayhandle = NULL;
 static vr::VROverlayHandle_t g_OverlayThumbnailHandle = NULL;
+static float g_RefreshRate = 60.0f; // default
 
 static void check_vk_result(VkResult err) {
     if (err == VK_SUCCESS)
@@ -540,6 +541,12 @@ int main(int, char**) {
 
     printf("VR_Init: %d\n", error);
 
+    // Get user HMD "Prop_DisplayFrequency_Float"
+    g_RefreshRate = vr::VRSystem()->GetFloatTrackedDeviceProperty(
+        vr::k_unTrackedDeviceIndex_Hmd,
+        vr::Prop_DisplayFrequency_Float
+    );
+
     // Setup SDL
     // [If using SDL_MAIN_USE_CALLBACKS: all code below until the main loop starts would likely be your SDL_AppInit() function]
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -678,6 +685,7 @@ int main(int, char**) {
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
+    uint64_t lastFrameTime = SDL_GetTicksNS();
     bool done = false;
     while (!done) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -819,6 +827,18 @@ int main(int, char**) {
 
             FrameRender(wd, draw_data);
             FramePresent(wd);
+
+            
+
+            float targetTime = static_cast<float>(1000000000) / g_RefreshRate;
+            const uint64_t frameDuration = (SDL_GetTicksNS() - lastFrameTime);
+
+            if (frameDuration < targetTime) 
+            {
+                SDL_DelayPrecise(targetTime - frameDuration);
+            }
+
+            lastFrameTime = SDL_GetTicksNS();
         }
     }
 
