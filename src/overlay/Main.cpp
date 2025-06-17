@@ -17,10 +17,13 @@
 #include "VulkanRenderer.h"
 #include "VulkanUtils.h"
 
+#include "ImGuiWindow.h"
+
 #include "VrOverlay.h"
 #include "VrUtils.h"
 
 static VulkanRenderer* g_vulkanRenderer = new VulkanRenderer();
+static ImGuiWindow* g_imGuiWindow = new ImGuiWindow();
 static VrOverlay* g_overlay = new VrOverlay();
 static ImGui_ImplVulkanH_Window g_MainWindowData = {};
 
@@ -103,67 +106,12 @@ int main(
     SDL_GetWindowSize(window, &initial_width, &initial_height);
 
     ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
+
     g_vulkanRenderer->SetupWindow(wd, surface, initial_width, initial_height);
+    g_imGuiWindow->InitializeSDLVulkan(window, wd, g_vulkanRenderer);
 
     SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(window); // don't use SDL_ShowWindow to hide the window
-
-    // == SDL Init End
-
-    // == ImGui Init Begin
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_IsSRGB;  // NOTE: ImGuiConfigFlags_IsSRGB is not used by ImGui, used to communicate state.
-    
-    io.IniFilename = nullptr;
-    io.DisplaySize = ImVec2(static_cast<float>(g_MainWindowData.Width), static_cast<float>(g_MainWindowData.Height));
-
-    ImGui::StyleColorsDark();
-
-    ImGuiStyle& style = ImGui::GetStyle();
-
-    if (io.ConfigFlags & ImGuiConfigFlags_IsSRGB) {
-        // hack: ImGui doesn't handle sRGB colour spaces properly so convert from Linear -> sRGB
-        // https://github.com/ocornut/imgui/issues/8271#issuecomment-2564954070
-        // remove when these are merged:
-        //  https://github.com/ocornut/imgui/pull/8110
-        //  https://github.com/ocornut/imgui/pull/8111
-        for (int i = 0; i < ImGuiCol_COUNT; i++) {
-            ImVec4& col = style.Colors[i];
-            col.x = col.x <= 0.04045f ? col.x / 12.92f : pow((col.x + 0.055f) / 1.055f, 2.4f);
-            col.y = col.y <= 0.04045f ? col.y / 12.92f : pow((col.y + 0.055f) / 1.055f, 2.4f);
-            col.z = col.z <= 0.04045f ? col.z / 12.92f : pow((col.z + 0.055f) / 1.055f, 2.4f);
-        }
-    }
-
-    ImGui_ImplVulkan_InitInfo init_info =
-    {
-        .ApiVersion = VK_API_VERSION_1_1,
-        .Instance = g_vulkanRenderer->Instance(),
-        .PhysicalDevice = g_vulkanRenderer->PhysicalDevice(),
-        .Device = g_vulkanRenderer->Device(),
-        .QueueFamily = g_vulkanRenderer->QueueFamily(),
-        .Queue = g_vulkanRenderer->Queue(),
-        .DescriptorPool = g_vulkanRenderer->DescriptorPool(),
-        .RenderPass = wd->RenderPass,
-        .MinImageCount = g_vulkanRenderer->MinimumConcurrentImageCount(),
-        .ImageCount = wd->ImageCount,
-        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-        .PipelineCache = g_vulkanRenderer->PipelineCache(),
-        .Subpass = 0,
-        .Allocator = g_vulkanRenderer->Allocator(),
-        .CheckVkResultFn = nullptr,
-    };
-
-    ImGui_ImplSDL3_InitForVulkan(window);
-    ImGui_ImplVulkan_Init(&init_info);
-
-    // == ImGui Init End
 
     SDL_Event event = {};
     vr::VREvent_t vr_event = {};
@@ -189,8 +137,8 @@ int main(
                 {
                     // OpenGL uses coordinate space Bottom Left == 0,0 where as Vulkan is Top Left == 0,0
                     // So we need to flip the y-axis to get the correct mouse position data
-                    auto [xPos, yPos] = std::pair{vr_event.data.mouse.x, ImGui::GetIO().DisplaySize.y - vr_event.data.mouse.y};
-                    io.AddMousePosEvent(xPos, yPos);
+                    const auto [x, y] = std::pair{vr_event.data.mouse.x, ImGui::GetIO().DisplaySize.y - vr_event.data.mouse.y};
+                    g_imGuiWindow->SendMousePosition(x, y);
                     break;
                 }
                 case vr::VREvent_MouseButtonDown:
@@ -205,7 +153,7 @@ int main(
                         mouse_button = ImGuiMouseButton_Middle;
 
                     if (mouse_button < ImGuiMouseButton_COUNT)
-                        io.AddMouseButtonEvent(mouse_button, true);
+                        g_imGuiWindow->SendMouseDown(mouse_button);
                     break;
                 }
                 case vr::VREvent_MouseButtonUp:
@@ -220,14 +168,14 @@ int main(
                         mouse_button = ImGuiMouseButton_Middle;
 
                     if (mouse_button < ImGuiMouseButton_COUNT)
-                        io.AddMouseButtonEvent(mouse_button, false);
+                        g_imGuiWindow->SendMouseUp(mouse_button);
                     break;
                 }
                 case vr::VREvent_ScrollDiscrete: 
                 {
                     const float y = vr_event.data.scroll.ydelta;
                     if (y != 0.0f)
-                        io.AddMouseWheelEvent(0.0f, y);
+                        g_imGuiWindow->SendMouseWheel(y);
                     break;
                 }
                 case vr::VREvent_Quit:
@@ -256,28 +204,7 @@ int main(
             g_vulkanRenderer->RebuildSwapChain(g_MainWindowData, fb_width, fb_height);
         }
 
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-
-        // == Menu Render Begin
-
-        {
-            static bool show_demo = true;
-            ImGui::ShowDemoWindow(&show_demo);
-        }
-
-        {
-            ImGui::Begin("Hello, world!");
-            ImGui::Text("This is some useful text.");
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-        }
-
-        // == Menu Render End
-
-        ImGui::EndFrame();
-        ImGui::Render();
+        g_imGuiWindow->Draw();
 
         ImDrawData* draw_data = ImGui::GetDrawData();
 
@@ -310,18 +237,11 @@ int main(
         // == Frametime Limiter Logic End
     }
 
-    g_overlay->Destroy();
-
     VkResult vk_result = vkDeviceWaitIdle(g_vulkanRenderer->Device());
     VK_VALIDATE_RESULT(vk_result);
 
-    ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-
-    ImGui::DestroyContext();
-
-    ImGui_ImplVulkanH_DestroyWindow(g_vulkanRenderer->Instance(), g_vulkanRenderer->Device(), &g_MainWindowData, g_vulkanRenderer->Allocator());
-
+    g_overlay->Destroy();
+    g_imGuiWindow->Destroy(g_MainWindowData, g_vulkanRenderer);
     g_vulkanRenderer->Destroy();
 
     SDL_DestroyWindow(window);
