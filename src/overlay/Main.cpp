@@ -17,44 +17,58 @@
 #include "VulkanRenderer.h"
 #include "VulkanUtils.h"
 
-static VulkanRenderer* g_vulkanRenderer = new VulkanRenderer();
-static ImGui_ImplVulkanH_Window g_MainWindowData;
+#include "VrOverlay.h"
+#include "VrUtils.h"
 
-static vr::VROverlayHandle_t g_Overlayhandle = NULL;
-static vr::VROverlayHandle_t g_OverlayThumbnailHandle = NULL;
-static float g_RefreshRate = 60.0f; // default
+static VulkanRenderer* g_vulkanRenderer = new VulkanRenderer();
+static VrOverlay* g_overlay = new VrOverlay();
+
+static ImGui_ImplVulkanH_Window g_MainWindowData;
+static float g_hmdRefreshRate = 60.0f; // default
+
+#define APP_KEY "nyabsi.LeapEx"
 
 int main(int, char**) {
-
-    vr::EVRInitError error;
-
     // Initialize the overlay as "VRApplication_Background" instead of "VRApplication_Overlay"
     // This makes sure that the overlay *cannot* run while SteamVR is not running.
-    VR_Init(&error, vr::VRApplication_Background);
-
-    // the overlay should not run when SteamVR us not running
-    if (error == vr::VRInitError_Init_NoServerForBackgroundApp) {
-        // the user doesn't need to know
+    try {
+        OpenVRInit(vr::VRApplication_Background);
+    } catch (std::exception ex) {
+        printf("Failed to initialize OpenVR\n%s\n\n", ex.what());
         return EXIT_FAILURE;
     }
 
-    printf("VR_Init: %d\n", error);
+    auto hmdProps = VrTrackedDeviceProperties::FromDeviceIndex(vr::k_unTrackedDeviceIndex_Hmd);
+    
+    // Get the current HMD refresh rate from device props
+    try {
+        g_hmdRefreshRate = hmdProps.GetFloat(vr::Prop_DisplayFrequency_Float);
+    } catch (std::exception ex) {
+        printf("Unable to determine Prop_DisplayFrequency_Float\n%s\n\n", ex.what());
+        return EXIT_FAILURE;
+    }
 
-    // Get user HMD "Prop_DisplayFrequency_Float"
-    g_RefreshRate = vr::VRSystem()->GetFloatTrackedDeviceProperty(
-        vr::k_unTrackedDeviceIndex_Hmd,
-        vr::Prop_DisplayFrequency_Float
-    );
+    printf("g_hmdRefreshRate = %02f\n", g_hmdRefreshRate);
+
+    // Install the Manifest from the current directory if it is not found
+    try {
+        if (!OpenVRManifestInstalled(APP_KEY)) {
+            OpenVRManifestInstall();
+        }
+    } catch (std::exception ex) {
+        printf("Failed to install OpenVR manifest\n%s\n\n", ex.what());
+        return EXIT_FAILURE;
+    }
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         printf("Error: SDL_Init(): %s\n", SDL_GetError());
-        return -1;
+        return EXIT_FAILURE;
     }
 
     SDL_Window* window = SDL_CreateWindow("LeapEx", 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
     if (window == nullptr) {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
-        return -1;
+        return EXIT_FAILURE;
     }
 
     g_vulkanRenderer->Initialize();
@@ -65,37 +79,16 @@ int main(int, char**) {
         return 1;
     }
 
-    std::string manifestPath{};
-    manifestPath += SDL_GetCurrentDirectory();
-    manifestPath += "manifest.vrmanifest";
-
-    if (!vr::VRApplications()->IsApplicationInstalled("nyabsi.LeapEx")) 
-    {
-        auto manifestError = vr::VRApplications()->AddApplicationManifest(manifestPath.data());
-
-        switch (manifestError)
-        {
-        case vr::VRApplicationError_None: printf("Installed OpenVR manifest from %s\n", manifestPath.data()); break;
-        case vr::VRApplicationError_InvalidManifest: printf("Could not find OpenVR manifest at %s\n", manifestPath.data()); break;
-        default: break;
-        }
-    } else {
-        printf("OpenVR manifest was already registered\n");
+    try {
+        g_overlay->CreateDashboardOverlay("nyabsi.LeapEx", "LeapEx");
+        // Configure the overlay
+        g_overlay->SetInputMethod(vr::VROverlayInputMethod_Mouse);
+        g_overlay->EnableFlag(vr::VROverlayFlags_SendVRDiscreteScrollEvents);
+        g_overlay->SetWidth(2.5f);
+    } catch (std::exception ex) {
+        printf("Failed to create overlay\nReason: %s\n\n", ex.what());
+        return EXIT_FAILURE;
     }
-
-    auto overlayError = vr::VROverlay()->CreateDashboardOverlay("nyabsi.LeapEx", "LeapEx", &g_Overlayhandle, &g_OverlayThumbnailHandle);
-    if (overlayError == vr::VROverlayError_KeyInUse) {
-        return 1;
-    }
-
-    if (g_Overlayhandle == vr::k_ulOverlayHandleInvalid) {
-        printf("Failed to create overlay\n");
-        return 1;
-    }
-
-    vr::VROverlay()->SetOverlayInputMethod(g_Overlayhandle, vr::VROverlayInputMethod_Mouse);
-    vr::VROverlay()->SetOverlayFlag(g_Overlayhandle, vr::VROverlayFlags_SendVRDiscreteScrollEvents, true);
-    vr::VROverlay()->SetOverlayWidthInMeters(g_Overlayhandle, 2.5f);
 
     int w, h;
     SDL_GetWindowSize(window, &w, &h);
@@ -104,6 +97,7 @@ int main(int, char**) {
     g_vulkanRenderer->SetupWindow(wd, surface, w, h);
 
     SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+
     // don't use SDL_ShowWindow to hide the window
     SDL_ShowWindow(window);
 
@@ -171,7 +165,8 @@ int main(int, char**) {
         }
 
         vr::VREvent_t vrEvent;
-        while (vr::VROverlay()->PollNextOverlayEvent(g_Overlayhandle, &vrEvent, sizeof(vrEvent))) {
+        while (vr::VROverlay()->PollNextOverlayEvent(g_overlay->Handle(), &vrEvent, sizeof(vrEvent))) 
+        {
             switch (vrEvent.eventType) {
             case vr::VREvent_MouseMove: {
                 // OpenGL uses coordinate space Bottom Left == 0,0 where as Vulkan is Top Left == 0,0
@@ -195,7 +190,9 @@ int main(int, char**) {
                 // io.AddMouseWheelEvent(x, y);
                 break;
             }
-            case vr::VREvent_Quit: done = true; return false;
+            case vr::VREvent_Quit: 
+                done = true; 
+                return false;
             }
         }
 
@@ -252,18 +249,18 @@ int main(int, char**) {
         ImDrawData* draw_data = ImGui::GetDrawData();
         const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
 
-        if (vr::VROverlay()->IsActiveDashboardOverlay(g_Overlayhandle) || !is_minimized)
+        if (vr::VROverlay()->IsActiveDashboardOverlay(g_overlay->Handle()) || !is_minimized)
         {
             wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
             wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
             wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
             wd->ClearValue.color.float32[3] = clear_color.w;
 
-            g_vulkanRenderer->Render(wd, draw_data, is_minimized, g_Overlayhandle);
+            g_vulkanRenderer->Render(wd, draw_data, is_minimized, g_overlay->Handle());
             g_vulkanRenderer->Present(wd, is_minimized);
         }
 
-        float targetTime = static_cast<float>(1000000000) / g_RefreshRate;
+        float targetTime = static_cast<float>(1000000000) / g_hmdRefreshRate;
         const uint64_t frameDuration = (SDL_GetTicksNS() - lastFrameTime);
 
         if (frameDuration < targetTime) {
@@ -273,7 +270,7 @@ int main(int, char**) {
         lastFrameTime = SDL_GetTicksNS();
     }
 
-    vr::VROverlay()->DestroyOverlay(g_Overlayhandle);
+    g_overlay->Destroy();
 
     VkResult vk_result = vkDeviceWaitIdle(g_vulkanRenderer->Device());
     VK_VALIDATE_RESULT(vk_result);
