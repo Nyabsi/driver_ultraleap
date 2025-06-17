@@ -690,6 +690,7 @@ int main(int, char**) {
         // SDL_AppEvent() function]
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+
             ImGui_ImplSDL3_ProcessEvent(&event);
 
             if (event.type == SDL_EVENT_QUIT)
@@ -704,7 +705,7 @@ int main(int, char**) {
             case vr::VREvent_MouseMove: {
                 // OpenGL uses coordinate space Bottom Left == 0,0 where as Vulkan is Top Left == 0,0
                 // So we need to flip the y-axis to get the correct mouse position data
-                auto [xPos, yPos] = std::pair{ vrEvent.data.mouse.x, ImGui::GetIO().DisplaySize.y - vrEvent.data.mouse.y };
+                auto [xPos, yPos] = std::pair{vrEvent.data.mouse.x, ImGui::GetIO().DisplaySize.y - vrEvent.data.mouse.y};
                 io.AddMousePosEvent(xPos, yPos);
             } break;
             case vr::VREvent_MouseButtonDown:
@@ -717,95 +718,108 @@ int main(int, char**) {
                 );
                 break;
             case vr::VREvent_ScrollDiscrete: {
+                // TODO: fix
                 // const float x = vrEvent.data.scroll.xdelta * 360.0f * 8.0f;
                 // const float y = vrEvent.data.scroll.ydelta * 360.0f * 8.0f;
                 // io.AddMouseWheelEvent(x, y);
                 break;
             }
-            case vr::VREvent_Quit: return false;
+            case vr::VREvent_Quit: done = true; return false;
             }
         }
 
-        ImGuiIO& io = ImGui::GetIO();
-        io.DisplaySize = ImVec2((float)g_MainWindowData.Width, (float)g_MainWindowData.Height);
+        bool debug_bypass_dashboard_active = true;
 
-        // Resize swap chain?
-        int fb_width, fb_height;
-        SDL_GetWindowSize(window, &fb_width, &fb_height);
-        if (fb_width > 0 && fb_height > 0
-            && (g_SwapChainRebuild || g_MainWindowData.Width != fb_width || g_MainWindowData.Height != fb_height)) {
-            ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount);
-            ImGui_ImplVulkanH_CreateOrResizeWindow(
-                g_Instance,
-                g_PhysicalDevice,
-                g_Device,
-                &g_MainWindowData,
-                g_QueueFamily,
-                g_Allocator,
-                fb_width,
-                fb_height,
-                g_MinImageCount
-            );
-            g_MainWindowData.FrameIndex = 0;
-            g_SwapChainRebuild = false;
-        }
-
-        // Start the Dear ImGui frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more
-        // about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+        // Only render if dashboard is activated
+        if (vr::VROverlay() && (vr::VROverlay()->IsActiveDashboardOverlay(g_Overlayhandle) || debug_bypass_dashboard_active))
         {
-            static float f = 0.0f;
-            static int counter = 0;
+            ImGuiIO& io = ImGui::GetIO();
+            io.DisplaySize = ImVec2((float)g_MainWindowData.Width, (float)g_MainWindowData.Height);
 
-            ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+            // Resize swap chain?
+            // Probably not needed as the window size is static
+            int fb_width, fb_height;
+            SDL_GetWindowSize(window, &fb_width, &fb_height);
+            if (fb_width > 0 && fb_height > 0
+                && (g_SwapChainRebuild || g_MainWindowData.Width != fb_width || g_MainWindowData.Height != fb_height)) {
+                ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount);
+                ImGui_ImplVulkanH_CreateOrResizeWindow(
+                    g_Instance,
+                    g_PhysicalDevice,
+                    g_Device,
+                    &g_MainWindowData,
+                    g_QueueFamily,
+                    g_Allocator,
+                    fb_width,
+                    fb_height,
+                    g_MinImageCount
+                );
+                g_MainWindowData.FrameIndex = 0;
+                g_SwapChainRebuild = false;
+            }
 
-            ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
+            // Start the Dear ImGui frame
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+            // == Menu Render Begin
 
-            if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn
+            // more about Dear ImGui!).
+            if (show_demo_window)
+                ImGui::ShowDemoWindow(&show_demo_window);
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
+            // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+            {
+                static float f = 0.0f;
+                static int counter = 0;
+
+                ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+
+                ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
+                ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
+                ImGui::Checkbox("Another Window", &show_another_window);
+
+                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+                ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+                if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
+                    counter++;
+                ImGui::SameLine();
+                ImGui::Text("counter = %d", counter);
+
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+                ImGui::End();
+            }
+
+            // 3. Show another simple window.
+            if (show_another_window) {
+                ImGui::Begin(
+                    "Another Window",
+                    &show_another_window
+                ); // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when
+                   // clicked)
+                ImGui::Text("Hello from another window!");
+                if (ImGui::Button("Close Me"))
+                    show_another_window = false;
+                ImGui::End();
+            }
+
+            // == Menu Render End
+
+            // Rendering
+            ImGui::Render();
+            ImDrawData* draw_data = ImGui::GetDrawData();
+
+            wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
+            wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
+            wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
+            wd->ClearValue.color.float32[3] = clear_color.w;
+
+            FrameRender(wd, draw_data);
+            FramePresent(wd);
         }
-
-        // 3. Show another simple window.
-        if (show_another_window) {
-            ImGui::Begin(
-                "Another Window",
-                &show_another_window
-            ); // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
-
-        // Rendering
-        ImGui::Render();
-        ImDrawData* draw_data = ImGui::GetDrawData();
-
-        wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
-        wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
-        wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
-        wd->ClearValue.color.float32[3] = clear_color.w;
-
-        FrameRender(wd, draw_data);
-        FramePresent(wd);
     }
 
     // Cleanup
