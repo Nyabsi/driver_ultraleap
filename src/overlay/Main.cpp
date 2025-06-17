@@ -379,6 +379,9 @@ static void FrameRender(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data) {
         vrTexture.eType = vr::TextureType_Vulkan;
 
         vr::VROverlay()->SetOverlayTexture(g_Overlayhandle, &vrTexture);
+
+        vr::HmdVector2_t overlayMouseScale = {(float)g_MainWindowData.Width, (float)g_MainWindowData.Height};
+        vr::VROverlay()->SetOverlayMouseScale(g_Overlayhandle, &overlayMouseScale);
     }
     {
         vkResetCommandPool(g_Device, fd->CommandPool, 0);
@@ -455,12 +458,11 @@ int main(int, char**) {
     }
 
     // Create window with Vulkan graphics context
-    float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-    SDL_WindowFlags window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    SDL_WindowFlags window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN;
     SDL_Window* window = SDL_CreateWindow(
-        "Dear ImGui SDL3+Vulkan example",
-        (int)(1280 * main_scale),
-        (int)(720 * main_scale),
+        "LeapEx",
+        (int)(1280),
+        (int)(720),
         window_flags
     );
     if (window == nullptr) {
@@ -522,6 +524,7 @@ int main(int, char**) {
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    io.IniFilename = nullptr;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -529,10 +532,6 @@ int main(int, char**) {
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(main_scale); // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
-                                     // requires resetting Style + calling this again)
-    style.FontScaleDpi = main_scale; // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave
-                                     // both here for documentation purpose)
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL3_InitForVulkan(window);
@@ -593,6 +592,7 @@ int main(int, char**) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL3_ProcessEvent(&event);
+
             if (event.type == SDL_EVENT_QUIT)
                 done = true;
             if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
@@ -601,9 +601,40 @@ int main(int, char**) {
 
         // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppIterate() function]
         if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
-            SDL_Delay(10);
-            continue;
+            //SDL_Delay(10);
+           // continue;
         }
+
+        vr::VREvent_t vrEvent;
+        while (vr::VROverlay()->PollNextOverlayEvent(g_Overlayhandle, &vrEvent, sizeof(vrEvent))) {
+            switch (vrEvent.eventType) {
+            case vr::VREvent_MouseMove: {
+                // OpenGL uses coordinate space Bottom Left == 0,0 where as Vulkan is Top Left == 0,0
+                // So we need to flip the y-axis to get the correct mouse position data
+                auto [xPos, yPos] = std::pair{ vrEvent.data.mouse.x, ImGui::GetIO().DisplaySize.y - vrEvent.data.mouse.y };
+                io.AddMousePosEvent(xPos, yPos);
+            } break;
+            case vr::VREvent_MouseButtonDown:
+                io.AddMouseButtonEvent((vrEvent.data.mouse.button & vr::VRMouseButton_Left) == vr::VRMouseButton_Left ? 0 : 1, true);
+                break;
+            case vr::VREvent_MouseButtonUp:
+                io.AddMouseButtonEvent(
+                    (vrEvent.data.mouse.button & vr::VRMouseButton_Left) == vr::VRMouseButton_Left ? 0 : 1,
+                    false
+                );
+                break;
+            case vr::VREvent_ScrollDiscrete: {
+                const float x = vrEvent.data.scroll.xdelta * 360.0f * 8.0f;
+                const float y = vrEvent.data.scroll.ydelta * 360.0f * 8.0f;
+                io.AddMouseWheelEvent(x, y);
+                break;
+            }
+            case vr::VREvent_Quit: return false;
+            }
+        }
+
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2((float)g_MainWindowData.Width, (float)g_MainWindowData.Height);
 
         // Resize swap chain?
         int fb_width, fb_height;
