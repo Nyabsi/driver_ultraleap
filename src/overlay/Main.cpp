@@ -118,7 +118,19 @@ int main(int, char**) {
     io.IniFilename = nullptr;
 
     ImGui::StyleColorsDark();
+
     ImGuiStyle& style = ImGui::GetStyle();
+    // hack: ImGui doesn't handle sRGB colour spaces properly so convert from Linear -> sRGB
+    // https://github.com/ocornut/imgui/issues/8271#issuecomment-2564954070
+    // remove when these are merged:
+    //  https://github.com/ocornut/imgui/pull/8110
+    //  https://github.com/ocornut/imgui/pull/8111
+    for (int i = 0; i < ImGuiCol_COUNT; i++) {
+        ImVec4& col = style.Colors[i];
+        col.x = col.x <= 0.04045f ? col.x / 12.92f : pow((col.x + 0.055f) / 1.055f, 2.4f);
+        col.y = col.y <= 0.04045f ? col.y / 12.92f : pow((col.y + 0.055f) / 1.055f, 2.4f);
+        col.z = col.z <= 0.04045f ? col.z / 12.92f : pow((col.z + 0.055f) / 1.055f, 2.4f);
+    }
 
     ImGui_ImplSDL3_InitForVulkan(window);
     ImGui_ImplVulkan_InitInfo init_info = {};

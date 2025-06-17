@@ -135,10 +135,7 @@ void VulkanRenderer::SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surf
     // request R8G8B8A8 (RGBA, instead of ARGB) format for OpenVR
     // All compatible formats can be found at https://github.com/ValveSoftware/openvr/wiki/Vulkan#image-formats
     const VkFormat surface_image_format[] = {
-        VK_FORMAT_R8G8B8A8_UNORM,
-        // for some reason looks really washed out
-        // TODO: fix?
-        // VK_FORMAT_R8G8B8A8_SRGB,
+        VK_FORMAT_R8G8B8A8_SRGB
     };
 
     // make sure colour space is non linear otherwise it will not render on AMD GPUs
