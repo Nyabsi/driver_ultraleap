@@ -297,6 +297,7 @@ auto VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
 
         try {
             overlay->SetTexture(vrTexture);
+            overlay->SetMouseScale(static_cast<float>(wd->Width), static_cast<float>(wd->Height));
         } catch (std::exception ex) {
             printf("Failed to set overlay texture\n%s\n\n", ex.what());
             return;

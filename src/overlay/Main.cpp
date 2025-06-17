@@ -10,6 +10,7 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_vulkan.h>
 
 #include <openvr.h>
@@ -82,7 +83,7 @@ int main(
         return EXIT_FAILURE;
     }
 
-    SDL_Window* window = SDL_CreateWindow(APP_NAME, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
+    SDL_Window* window = SDL_CreateWindow(APP_NAME, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_MOUSE_FOCUS);
     if (window == nullptr) {
         printf("SDL_CreateWindow(): %s\n", SDL_GetError());
         return EXIT_FAILURE;
@@ -106,14 +107,15 @@ int main(
     g_imGuiWindow->InitializeSDLVulkan(window, wd, g_vulkanRenderer);
 
     SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    SDL_ShowWindow(window); // don't use SDL_ShowWindow to hide the window
+    SDL_SetWindowFocusable(window, false);
+    SDL_CaptureMouse(false);
+    SDL_ShowWindow(window);
 
     SDL_Event event = {};
     vr::VREvent_t vr_event = {};
 
     while (g_ticking) 
     {
-        // TODO: make sure SDL_PollEvent doesn't conflict with PollNextOverlayEvent
         while (SDL_PollEvent(&event)) 
         {
             ImGui_ImplSDL3_ProcessEvent(&event);
@@ -168,6 +170,8 @@ int main(
                 }
                 case vr::VREvent_ScrollDiscrete: 
                 {
+                    // Emulate "physical" mouse behaviour by only sending y-axis
+                    // 1.0f == Scrolling Up, -1.0f == Scrolling Down
                     const float y = vr_event.data.scroll.ydelta;
                     if (y != 0.0f)
                         g_imGuiWindow->SendMouseWheel(y);

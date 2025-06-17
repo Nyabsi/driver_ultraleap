@@ -87,8 +87,6 @@ auto ImGuiWindow::SendMouseUp(int button) -> void
 auto ImGuiWindow::SendMouseWheel(float y) -> void 
 {
     ImGuiIO& io = ImGui::GetIO();
-    // Emulate "physical" mouse behaviour by only sending y-axis
-    // 1.0f == Scrolling Up, -1.0f == Scrolling Down
     io.AddMouseWheelEvent(0.0f, y);
 }
 

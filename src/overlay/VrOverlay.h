@@ -57,6 +57,13 @@ public:
             throw std::runtime_error(std::format("Failed to set texture {}", static_cast<int>(result)));
     }
 
+    [[maybe_unused]] auto SetMouseScale(float x, float y) -> void {
+        vr::HmdVector2_t scale = {x, y};
+        vr::EVROverlayError result = vr::VROverlay()->SetOverlayMouseScale(handle, &scale);
+        if (result > vr::VROverlayError_None)
+            throw std::runtime_error(std::format("Failed to set texture {}", static_cast<int>(result)));
+    }
+
     [[maybe_unused]] auto IsDashboardActive() -> bool { 
         return vr::VROverlay()->IsActiveDashboardOverlay(handle);
     }
