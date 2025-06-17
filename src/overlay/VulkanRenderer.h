@@ -11,6 +11,8 @@
 
 #include <openvr.h>
 
+#include "VrOverlay.h"
+
 class VulkanRenderer {
 public:
     explicit VulkanRenderer();
@@ -30,7 +32,7 @@ public:
 
     void SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface, int width, int height);
     void RebuildSwapChain(ImGui_ImplVulkanH_Window& wd, int width, int height);
-    void Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, vr::VROverlayHandle_t overlayHandle);
+    void Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, VrOverlay*& overlay);
     void Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized);
 
     void Destroy();

@@ -27,10 +27,9 @@ VulkanRenderer::VulkanRenderer()
 
 void VulkanRenderer::Initialize() 
 {
-    VkResult vk_result{};
+    VkResult vk_result = {};
 
-    auto get_instance_extensions = [](const std::vector<std::string>& extensions) -> std::vector<const char*> 
-    {
+    auto get_instance_extensions = [](const std::vector<std::string>& extensions) -> std::vector<const char*> {
         std::vector<const char*> result;
         for (auto& extension : extensions)
             result.push_back(extension.data());
@@ -56,8 +55,7 @@ void VulkanRenderer::Initialize()
     vulkan_queue_family_ = ImGui_ImplVulkanH_SelectQueueFamilyIndex(vulkan_physical_device_);
     assert(vulkan_queue_family_ != (uint32_t)-1);
 
-    auto get_device_extensions = [&](const std::vector<std::string>& extensions) -> std::vector<const char*> 
-    {
+    auto get_device_extensions = [&](const std::vector<std::string>& extensions) -> std::vector<const char*> {
         std::vector<const char*> result = {};
         for (auto& extension : vulkan_device_extensions_)
             result.push_back(extension.c_str());
@@ -119,7 +117,7 @@ void VulkanRenderer::Initialize()
 
 void VulkanRenderer::SetupWindow(ImGui_ImplVulkanH_Window* wd, VkSurfaceKHR surface, int width, int height) 
 {
-    VkResult vk_result{};
+    VkResult vk_result = {};
 
     wd->Surface = surface;
 
@@ -195,7 +193,7 @@ void VulkanRenderer::RebuildSwapChain(ImGui_ImplVulkanH_Window& wd, int width, i
     should_rebuild_swapchain_ = false;
 }
 
-void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, vr::VROverlayHandle_t overlayHandle) 
+void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data, bool is_minimized, VrOverlay*& overlay) 
 {
     VkResult vk_result = {};
 
@@ -222,7 +220,7 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
     ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
 
     // Make sure vr::VROverlay() returns valid pointer and make sure our overlay is currently active before rendering the overlay
-    const bool overlay_active = vr::VROverlay() && vr::VROverlay()->IsActiveDashboardOverlay(overlayHandle);
+    const bool overlay_active = overlay->IsDashboardActive();
     if (overlay_active)
     {
         vk_result = vkWaitForFences(vulkan_device_, 1, &fd->Fence, VK_TRUE, UINT64_MAX);
@@ -237,9 +235,15 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
         vk_result = vkBeginCommandBuffer(fd->CommandBuffer, &buffer_begin_info);
         VK_VALIDATE_RESULT(vk_result);
 
+        VkSubmitInfo submit_info_barrier = {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &fd->CommandBuffer,
+        };
+
         // OpenVR expects the Image layout to be "VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL"
         // https://github.com/ValveSoftware/openvr/wiki/Vulkan#image-layout
-        VkImageMemoryBarrier barrier =
+        VkImageMemoryBarrier image_barrier_optimal =
         {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask = VK_IMAGE_ASPECT_NONE,
@@ -269,18 +273,11 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
             0,
             nullptr,
             1,
-            &barrier
+            &image_barrier_optimal
         );
 
         vk_result = vkEndCommandBuffer(fd->CommandBuffer);
         VK_VALIDATE_RESULT(vk_result);
-
-        VkSubmitInfo submit_info_barrier = 
-        {
-            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .commandBufferCount = 1,
-            .pCommandBuffers = &fd->CommandBuffer,
-        };
 
         vk_result = vkQueueSubmit(vulkan_queue_, 1, &submit_info_barrier, fd->Fence);
         VK_VALIDATE_RESULT(vk_result);
@@ -306,12 +303,66 @@ void VulkanRenderer::Render(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data,
         { 
             .handle = (void*)&vulkanTexure,
             .eType = vr::TextureType_Vulkan,
-            .eColorSpace = vr::ColorSpace_Auto,
+            .eColorSpace = vr::ColorSpace_Auto, // vr::ColorSpace_Linear does not work on AMD
         };
 
-        vr::VROverlay()->SetOverlayTexture(overlayHandle, &vrTexture);
+        try {
+            overlay->SetTexture(vrTexture);
+        } catch (std::exception ex) {
+            printf("Failed to set overlay texture\n%s\n\n", ex.what());
+            return;
+        }
 
-        // TODO: should we restore the barrier after SetOverlayTexture? as it doesn't set VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL back to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        vk_result = vkWaitForFences(vulkan_device_, 1, &fd->Fence, VK_TRUE, UINT64_MAX);
+        VK_VALIDATE_RESULT(vk_result);
+
+        vk_result = vkResetFences(vulkan_device_, 1, &fd->Fence);
+        VK_VALIDATE_RESULT(vk_result);
+
+        vk_result = vkResetCommandPool(vulkan_device_, fd->CommandPool, 0);
+        VK_VALIDATE_RESULT(vk_result);
+
+        vk_result = vkBeginCommandBuffer(fd->CommandBuffer, &buffer_begin_info);
+        VK_VALIDATE_RESULT(vk_result);
+
+        VkImageMemoryBarrier image_barrier_khr =
+        {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = VK_IMAGE_ASPECT_NONE,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = fd->Backbuffer,
+            .subresourceRange = 
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        vkCmdPipelineBarrier(
+            fd->CommandBuffer,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &image_barrier_khr
+        );
+
+        vk_result = vkEndCommandBuffer(fd->CommandBuffer);
+        VK_VALIDATE_RESULT(vk_result);
+
+        vk_result = vkQueueSubmit(vulkan_queue_, 1, &submit_info_barrier, fd->Fence);
+        VK_VALIDATE_RESULT(vk_result);
     }
 
     if (!is_minimized)
@@ -404,7 +455,8 @@ void VulkanRenderer::Present(ImGui_ImplVulkanH_Window* wd, bool is_minimized)
     wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->SemaphoreCount;
 }
 
-void VulkanRenderer::Destroy() {
+void VulkanRenderer::Destroy() 
+{
     vkDestroyDescriptorPool(vulkan_device_, vulkan_descriptor_pool_, vulkan_allocator_);
     vkDestroyDevice(vulkan_device_, vulkan_allocator_);
     vkDestroyInstance(vulkan_instance_, vulkan_allocator_);

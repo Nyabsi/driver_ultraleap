@@ -66,7 +66,8 @@ static auto GetVulkanInstanceExtensionsRequiredByOpenVR() -> std::vector<std::st
     return result;
 }
 
-static auto GetVulkanDeviceExtensionsRequiredByOpenVR(const VkPhysicalDevice& device) -> std::vector<std::string> {
+static auto GetVulkanDeviceExtensionsRequiredByOpenVR(const VkPhysicalDevice& device) -> std::vector<std::string> 
+{
     std::vector<std::string> result{};
 
     if (!vr::VRCompositor()) {

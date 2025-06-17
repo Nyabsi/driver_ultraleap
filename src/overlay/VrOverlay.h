@@ -51,6 +51,16 @@ public:
             throw std::runtime_error(std::format("Failed to set overlay width \"{}\": {}", width, static_cast<int>(result)));
     }
 
+    [[maybe_unused]] auto SetTexture(const vr::Texture_t& texture) -> void {
+        vr::EVROverlayError result = vr::VROverlay()->SetOverlayTexture(handle, &texture);
+        if (result > vr::VROverlayError_None)
+            throw std::runtime_error(std::format("Failed to set texture {}", static_cast<int>(result)));
+    }
+
+    [[maybe_unused]] auto IsDashboardActive() -> bool { 
+        return vr::VROverlay()->IsActiveDashboardOverlay(handle);
+    }
+
     [[maybe_unused]] auto Destroy() -> void {
         vr::VROverlay()->DestroyOverlay(handle);
     }
