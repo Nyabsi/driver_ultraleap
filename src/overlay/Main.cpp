@@ -28,7 +28,10 @@ static float g_hmdRefreshRate = 60.0f; // default
 
 #define APP_KEY "nyabsi.LeapEx"
 
-int main(int, char**) {
+int main(
+    [[maybe_unused]] int argc, 
+    [[maybe_unused]] char** argv
+) {
     // Initialize the overlay as "VRApplication_Background" instead of "VRApplication_Overlay"
     // This makes sure that the overlay *cannot* run while SteamVR is not running.
     try {
