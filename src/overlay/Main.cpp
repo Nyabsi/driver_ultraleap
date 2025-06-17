@@ -70,6 +70,7 @@ int main(
         // Set the overlay properties
         g_overlay->SetInputMethod(vr::VROverlayInputMethod_Mouse);
         g_overlay->EnableFlag(vr::VROverlayFlags_SendVRDiscreteScrollEvents);
+        g_overlay->EnableFlag(vr::VROverlayFlags_EnableClickStabilization);
         g_overlay->SetWidth(2.5f);
     } catch (std::exception ex) {
         printf("Failed to create overlay\n%s\n\n", ex.what());
