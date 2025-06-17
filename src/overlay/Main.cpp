@@ -31,6 +31,9 @@ static bool g_ticking = true;
 #define APP_KEY     "nyabsi.LeapEx"
 #define APP_NAME    "LeapEx Configuration Overlay"
 
+#define WIN_WIDTH   1280
+#define WIN_HEIGHT  720
+
 int main(
     [[maybe_unused]] int argc, 
     [[maybe_unused]] char** argv
@@ -75,12 +78,12 @@ int main(
 
     // == SDL Init Begin
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         printf("SDL_Init(): %s\n", SDL_GetError());
         return EXIT_FAILURE;
     }
 
-    SDL_Window* window = SDL_CreateWindow(APP_NAME, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
+    SDL_Window* window = SDL_CreateWindow(APP_NAME, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
     if (window == nullptr) {
         printf("SDL_CreateWindow(): %s\n", SDL_GetError());
         return EXIT_FAILURE;
